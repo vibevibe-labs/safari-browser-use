@@ -31,7 +31,7 @@ Safari 27 is not supported by this release.
 Paste into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 
 ```text
-Install Safari Browser Use from https://github.com/vibevibe-labs/safari-browser-use using this client's native plugin system. Only install the plugin: do not open, configure, or test Safari. When installation is complete, tell me whether to start a new task or reload plugins, then give me one example request for using it.
+Install the Safari Browser Use plugin from https://github.com/vibevibe-labs/safari-browser-use using the current client's plugin installer. Stop after installation, then tell me whether to reload plugins or start a new session and give me one example request.
 ```
 
 ### Manual installation
