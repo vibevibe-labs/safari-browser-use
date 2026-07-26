@@ -40,11 +40,10 @@ reordering.
 ## Control Indicator
 
 Selecting a tab or calling one of its browser methods displays a non-interactive
-perimeter glow and replaces the original favicon with a solid yellow light that
-remains visible in compact Safari tabs. The page glow and yellow favicon share
-one control lifecycle. Call `browser.release()` when the browser task finishes.
-The indicator is removed and the original favicon is restored by `js_reset`,
-MCP shutdown, or 45 seconds without activity on that tab.
+perimeter glow and visible fake cursor on the controlled page. They share one
+control lifecycle. Call `browser.release()` when the browser task finishes.
+The indicator is removed by `js_reset`, MCP shutdown, or 45 seconds without
+activity on that tab.
 
 ## Locator Builders
 

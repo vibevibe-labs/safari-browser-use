@@ -97,12 +97,10 @@ The agent checks the connection, selects the active tab, and reads a structured
 DOM snapshot. Variables persist between `js` calls; use `js_reset` when you
 want a clean REPL context.
 
-Selecting or operating a tab adds a non-interactive perimeter glow and replaces
-the original favicon with a solid yellow light that remains visible in
-compact Safari tabs. The page glow and yellow favicon start and stop together as one
-control indicator. It is removed with `browser.release()` when the task ends,
-restoring the original favicon, and clears automatically after 45 seconds
-without tab activity.
+Selecting or operating a tab adds a non-interactive perimeter glow and visible
+fake cursor to the controlled page. They share one control lifecycle: both are
+removed with `browser.release()` when the task ends and clear automatically
+after 45 seconds without tab activity.
 
 ## Highlights
 
@@ -111,7 +109,7 @@ without tab activity.
 | 🌐 Existing Safari session | Work with your open tabs, cookies, and signed-in state |
 | ⚡ Persistent synchronous REPL | Reuse variables and browser state across tool calls |
 | 🎭 Playwright-style API | Locate elements by role, label, text, test ID, or attribute |
-| ✨ Visible control indicator | See a perimeter glow and solid yellow favicon while AI control is active |
+| ✨ Visible control indicator | See a perimeter glow and fake cursor while AI control is active |
 | 🔌 Native agent plugins | Install directly in Codex, Claude Code, GitHub Copilot, or Cursor |
 | 🛡️ Deliberate interactions | Inspect first, target unique elements, and verify every action |
 

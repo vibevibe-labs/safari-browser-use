@@ -372,47 +372,37 @@ test("leaves the controlled tab title unchanged", () => {
   execute("control.hide");
 });
 
-test("replaces the original favicon with a solid yellow light", () => {
+test("leaves the controlled tab favicon unchanged", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
   const original = window.document.createElement("link");
-  let intervals = 0;
 
   original.setAttribute("rel", "icon");
   original.setAttribute("href", "/favicon.svg?theme=dark&v=1");
   window.document.head.append(original);
-  window.setInterval = () => {
-    intervals++;
-    return 7;
-  };
 
   execute("control.show", { leaseMs: 1000 });
 
-  const favicon = window.document.querySelector(
-    "[data-safari-browser-use-control-favicon]"
+  assert.equal(original.isConnected, true);
+  assert.equal(
+    original.getAttribute("href"),
+    "/favicon.svg?theme=dark&v=1"
   );
-  const href = favicon.getAttribute("href");
-  const svg = decodeURIComponent(href.split(",")[1]);
-
-  assert.equal(original.isConnected, false);
-  assert.equal(favicon.getAttribute("rel"), "icon");
-  assert.equal(favicon.getAttribute("type"), "image/svg+xml");
-  assert.match(href, /^data:image\/svg\+xml,/);
-  assert.match(svg, /fill="#ffd400"/i);
-  assert.doesNotMatch(svg, /<image /i);
-  assert.equal(intervals, 0);
+  assert.equal(
+    window.document.querySelectorAll('link[rel~="icon"]').length,
+    1
+  );
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control-favicon]"
+    ),
+    null
+  );
 
   execute("control.hide");
 });
 
-test("starts and stops the overlay and yellow favicon together", () => {
+test("starts and stops the overlay and fake cursor together", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
-  const original = window.document.createElement("link");
-  const following = window.document.createElement("meta");
-
-  original.setAttribute("rel", "icon");
-  original.setAttribute("href", "/favicon.ico");
-  following.setAttribute("name", "theme-color");
-  window.document.head.append(original, following);
 
   execute("control.show", { leaseMs: 1000 });
 
@@ -424,11 +414,10 @@ test("starts and stops the overlay and yellow favicon together", () => {
   );
   assert.notEqual(
     window.document.querySelector(
-      "[data-safari-browser-use-control-favicon]"
+      "[data-safari-browser-use-control-cursor]"
     ),
     null
   );
-  assert.equal(original.isConnected, false);
 
   execute("control.hide");
 
@@ -440,12 +429,10 @@ test("starts and stops the overlay and yellow favicon together", () => {
   );
   assert.equal(
     window.document.querySelector(
-      "[data-safari-browser-use-control-favicon]"
+      "[data-safari-browser-use-control-cursor]"
     ),
     null
   );
-  assert.equal(original.isConnected, true);
-  assert.equal(original.nextSibling, following);
 });
 
 test("does not interfere with page title updates", () => {
@@ -482,11 +469,6 @@ test("hides the AI control indicator and its styles", () => {
 
 test("expires the AI control indicator after inactivity", async () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
-  const original = window.document.createElement("link");
-
-  original.setAttribute("rel", "icon");
-  original.setAttribute("href", "/favicon.ico");
-  window.document.head.append(original);
 
   execute("control.show", { leaseMs: 5 });
   await new Promise(resolve => setTimeout(resolve, 20));
@@ -499,9 +481,8 @@ test("expires the AI control indicator after inactivity", async () => {
   );
   assert.equal(
     window.document.querySelector(
-      "[data-safari-browser-use-control-favicon]"
+      "[data-safari-browser-use-control-cursor]"
     ),
     null
   );
-  assert.equal(original.isConnected, true);
 });

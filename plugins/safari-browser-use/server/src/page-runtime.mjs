@@ -24,69 +24,6 @@ export function runPageOperation(
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
-  const controlFaviconAttribute =
-    "data-safari-browser-use-control-favicon";
-  const controlFaviconStateKey =
-    "__safari_browser_use_control_favicon_state__";
-
-  function controlFaviconUrl() {
-    const svg = [
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
-      '<circle cx="16" cy="16" r="13" fill="#ffd400"',
-      ' stroke="#665500" stroke-width="2"/>',
-      '<circle cx="11" cy="10" r="4" fill="#fff3a0"/>',
-      "</svg>"
-    ].join("");
-
-    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-  }
-
-  function showControlFavicon() {
-    const originals = Array.from(
-      document.querySelectorAll('link[rel~="icon"]')
-    ).map(link => ({
-      link,
-      parent: link.parentNode,
-      nextSibling: link.nextSibling
-    }));
-
-    originals.forEach(({ link }) => link.remove());
-
-    const favicon = document.createElement("link");
-    favicon.setAttribute("rel", "icon");
-    favicon.setAttribute("type", "image/svg+xml");
-    favicon.setAttribute(controlFaviconAttribute, "");
-    favicon.setAttribute("href", controlFaviconUrl());
-    (document.head || document.documentElement).append(favicon);
-
-    window[controlFaviconStateKey] = {
-      favicon,
-      originals
-    };
-  }
-
-  function restoreControlFavicon() {
-    const state = window[controlFaviconStateKey];
-
-    if (!state) {
-      return;
-    }
-
-    state.favicon?.remove();
-
-    for (let index = state.originals.length - 1; index >= 0; index--) {
-      const { link, parent, nextSibling } = state.originals[index];
-
-      if (!link.isConnected && parent?.isConnected) {
-        const reference = nextSibling?.parentNode === parent
-          ? nextSibling
-          : null;
-        parent.insertBefore(link, reference);
-      }
-    }
-
-    delete window[controlFaviconStateKey];
-  }
 
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
@@ -96,7 +33,6 @@ export function runPageOperation(
       `[${controlIndicatorAttribute}]`
     )?.remove();
     document.getElementById(controlStyleId)?.remove();
-    restoreControlFavicon();
 
     return { visible: false };
   }
@@ -174,7 +110,6 @@ export function runPageOperation(
     });
     indicator.append(cursor);
     document.documentElement.append(indicator);
-    showControlFavicon();
 
     const requestedLeaseMs = Number(options.leaseMs);
     const leaseMs = Number.isFinite(requestedLeaseMs) &&
