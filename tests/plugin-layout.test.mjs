@@ -257,7 +257,7 @@ test("skill documents bounded virtualized-list collection", async () => {
   assert.match(runtimeApi, /synthetic/i);
 });
 
-test("control indicator docs cover compact Safari tabs", async () => {
+test("control indicator docs describe only the page overlay", async () => {
   const documents = await Promise.all([
     readFile(new URL("README.md", repositoryRoot), "utf8"),
     readFile(
@@ -274,10 +274,10 @@ test("control indicator docs cover compact Safari tabs", async () => {
   ]);
 
   for (const document of documents) {
-    assert.match(document, /favicon/i);
-    assert.match(document, /compact Safari\s+tabs/i);
-    assert.match(document, /original favicon/i);
-    assert.match(document, /yellow.*light/is);
+    assert.match(document, /perimeter glow/i);
+    assert.match(document, /(?:fake|visible) cursor/i);
+    assert.doesNotMatch(document, /favicon/i);
+    assert.doesNotMatch(document, /compact Safari\s+tabs/i);
   }
 });
 
