@@ -1,0 +1,11 @@
+{
+  "safari-browser-use": {
+    "command": "/usr/bin/osascript",
+    "args": [
+      "-l",
+      "JavaScript",
+      "dist/server.jxa.js"
+    ],
+    "cwd": "."
+  }
+}

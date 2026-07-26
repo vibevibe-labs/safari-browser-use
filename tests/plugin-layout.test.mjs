@@ -15,7 +15,7 @@ async function readRepositoryJson(path) {
 
 test("all client manifests expose the shared skill and native MCP config", async () => {
   const manifests = [
-    [".codex-plugin/plugin.json", "./.mcp.json"],
+    [".codex-plugin/plugin.json", "./codex.mcp.json"],
     [".claude-plugin/plugin.json", "./.mcp.json"],
     ["plugin.json", "./copilot.mcp.json"],
     [".cursor-plugin/plugin.json", "./cursor.mcp.json"]
@@ -33,6 +33,7 @@ test("all client manifests expose the shared skill and native MCP config", async
 
 test("client MCP configurations start JXA with the system osascript", async () => {
   const configurations = [
+    ["codex.mcp.json", "dist/server.jxa.js"],
     [".mcp.json", "${CLAUDE_PLUGIN_ROOT}/dist/server.jxa.js"],
     ["copilot.mcp.json", "${PLUGIN_ROOT}/dist/server.jxa.js"],
     ["cursor.mcp.json", "${CURSOR_PLUGIN_ROOT}/dist/server.jxa.js"]
@@ -40,7 +41,8 @@ test("client MCP configurations start JXA with the system osascript", async () =
 
   for (const [path, serverPath] of configurations) {
     const config = await readJson(path);
-    const server = config.mcpServers["safari-browser-use"];
+    const servers = config.mcpServers ?? config.mcp_servers ?? config;
+    const server = servers["safari-browser-use"];
 
     assert.equal(server.command, "/usr/bin/osascript");
     assert.deepEqual(server.args, [
@@ -49,6 +51,9 @@ test("client MCP configurations start JXA with the system osascript", async () =
       serverPath
     ]);
   }
+
+  const codex = await readJson("codex.mcp.json");
+  assert.equal(codex["safari-browser-use"].cwd, ".");
 
   const copilot = await readJson("copilot.mcp.json");
   assert.deepEqual(
@@ -172,6 +177,7 @@ test("skill uses Apple Events without an extension bridge", async () => {
   assert.match(skill, /synchronous/i);
   assert.match(skill, /browser\.release\(\)/);
   assert.match(skill, /control indicator/i);
+  assert.match(skill, /do not fall back/i);
   assert.doesNotMatch(skill, /\bawait\b/);
   assert.doesNotMatch(skill, /bridge|Safari extension/i);
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -6,6 +7,42 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   StdioClientTransport
 } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+test("starts from the Codex plugin manifest", async t => {
+  const pluginRoot = new URL("../plugins/safari-browser-use/", import.meta.url);
+  const manifest = JSON.parse(await readFile(
+    new URL(".codex-plugin/plugin.json", pluginRoot),
+    "utf8"
+  ));
+  const config = JSON.parse(await readFile(
+    new URL(manifest.mcpServers, pluginRoot),
+    "utf8"
+  ));
+  const servers = config.mcpServers ?? config.mcp_servers ?? config;
+  const server = servers["safari-browser-use"];
+  const transport = new StdioClientTransport({
+    command: server.command,
+    args: server.args,
+    cwd: fileURLToPath(pluginRoot),
+    stderr: "pipe"
+  });
+  const client = new Client({
+    name: "safari-browser-use-codex-config-test",
+    version: "0.1.0"
+  });
+
+  t.after(async () => {
+    await client.close();
+  });
+
+  await client.connect(transport);
+
+  const tools = await client.listTools();
+  assert.deepEqual(
+    tools.tools.map(tool => tool.name),
+    ["js", "js_reset"]
+  );
+});
 
 test("starts the real MCP entrypoint over stdio", async t => {
   const entrypoint = process.env.MCP_ENTRYPOINT ?? fileURLToPath(new URL(
