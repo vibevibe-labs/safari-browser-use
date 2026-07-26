@@ -30,6 +30,7 @@ Cells are synchronous. The value of the final expression is returned.
 | `tab.goto(url)` | Navigate to an HTTP or HTTPS URL |
 | `tab.close()` | Close the tab |
 | `tab.playwright.domSnapshot()` | Read a semantic DOM snapshot |
+| `tab.playwright.scrollBy(deltaX, deltaY)` | Scroll the page by explicit pixel offsets |
 | `tab.playwright.waitForTimeout(ms)` | Wait for a fixed duration |
 
 Safari tab coordinates can change when tabs are moved or closed. Reacquire the
@@ -78,16 +79,29 @@ var buy = card.getByRole("button", { name: "Buy", exact: true })
 | `innerText(options?)` | Read rendered text |
 | `textContent(options?)` | Read raw text content |
 | `allTextContents(options?)` | Read text for every match |
+| `allAttributes(name, options?)` | Read one attribute for every match |
 | `getAttribute(name, options?)` | Read one attribute |
 | `isVisible()` | Check visibility |
 | `isEnabled()` | Check whether the control is enabled |
 | `check()` / `uncheck()` | Change a checkbox or radio |
 | `setChecked(value)` | Set checked state explicitly |
 | `selectOption(value)` | Select native `<select>` options |
+| `scrollIntoView(options?)` | Scroll one strict match into view without clicking it |
 | `waitFor(options?)` | Wait for the locator |
 
 `click`, `fill`, `type`, `press`, and single-element reads use strict mode and
 throw when the locator resolves to zero or multiple elements.
+
+`press()` dispatches synthetic page events, not trusted Safari keyboard input.
+Keys that depend on browser-default behavior—Tab, PageDown, PageUp, Home, End,
+and Space—are rejected. Use `scrollBy()` or `scrollIntoView()` for scrolling
+and direct locator actions for interaction.
+
+For virtualized or infinite lists, collect and deduplicate the current batch,
+call `last().scrollIntoView({ block: "end" })`, wait briefly, and repeat with a
+fixed round limit. Stop after reaching a known total or three consecutive
+rounds without new stable keys. Use `allAttributes("href")` when link targets
+are more stable than visible text.
 
 ## Persistent State
 

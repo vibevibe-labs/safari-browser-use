@@ -507,6 +507,18 @@ function runPageOperation(
     return domSnapshot();
   }
 
+  if (method === "playwright.scrollBy") {
+    const deltaX = Number(params.deltaX ?? 0);
+    const deltaY = Number(params.deltaY ?? 0);
+
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+      throw new Error("invalid_scroll_offset");
+    }
+
+    window.scrollBy(deltaX, deltaY);
+    return { deltaX, deltaY };
+  }
+
   if (method === "control.show") {
     return showControlIndicator(params);
   }
@@ -536,6 +548,16 @@ function runPageOperation(
     return matches.map(element => element.textContent ?? "");
   }
 
+  if (operation === "allAttributes") {
+    if (typeof params.name !== "string" || !params.name) {
+      throw new Error("attribute_name_required");
+    }
+
+    return matches.map(element =>
+      element.getAttribute(params.name)
+    );
+  }
+
   const element = oneLocatorElement(params.locator);
 
   switch (operation) {
@@ -555,17 +577,45 @@ function runPageOperation(
         `${element.value ?? ""}${params.value}`
       );
       return { typed: true };
-    case "press":
+    case "press": {
+      const key = String(params.value);
+      const unsupportedDefaultActionKeys = [
+        "Tab",
+        "PageDown",
+        "PageUp",
+        "Home",
+        "End",
+        "Space",
+        " "
+      ];
+
+      if (unsupportedDefaultActionKeys.includes(key)) {
+        throw new Error(
+          "unsupported_press_default_action: " +
+          `"${key}" cannot be synthesized; use ` +
+          "tab.playwright.scrollBy() or locator.scrollIntoView()"
+        );
+      }
+
       element.focus?.();
       element.dispatchEvent(new window.KeyboardEvent("keydown", {
-        key: params.value,
+        key,
         bubbles: true
       }));
       element.dispatchEvent(new window.KeyboardEvent("keyup", {
-        key: params.value,
+        key,
         bubbles: true
       }));
-      return { pressed: true };
+      return { pressed: true, trusted: false };
+    }
+    case "scrollIntoView": {
+      const options = params.options || {};
+      element.scrollIntoView?.({
+        block: options.block || "center",
+        inline: options.inline || "nearest"
+      });
+      return { scrolled: true };
+    }
     case "innerText":
       return normalizeText(element.innerText);
     case "textContent":
@@ -1248,6 +1298,13 @@ var run = (function (globalObject) {
     });
   };
 
+  SafariLocator.prototype.allAttributes = function (name, options) {
+    return this.call("allAttributes", {
+      name: name,
+      options: options || {}
+    });
+  };
+
   SafariLocator.prototype.getAttribute = function (name, options) {
     return this.call("getAttribute", {
       name: name,
@@ -1301,6 +1358,12 @@ var run = (function (globalObject) {
     return this.call("waitFor", { options: options || {} });
   };
 
+  SafariLocator.prototype.scrollIntoView = function (options) {
+    return this.call("scrollIntoView", {
+      options: options || {}
+    });
+  };
+
   function SafariPlaywright(tabId) {
     this.tabId = tabId;
   }
@@ -1351,6 +1414,17 @@ var run = (function (globalObject) {
   SafariPlaywright.prototype.domSnapshot = function () {
     return callSafari("playwright.domSnapshot", {
       tabId: this.tabId
+    });
+  };
+
+  SafariPlaywright.prototype.scrollBy = function (
+    deltaX,
+    deltaY
+  ) {
+    return callSafari("playwright.scrollBy", {
+      tabId: this.tabId,
+      deltaX: deltaX,
+      deltaY: deltaY
     });
   };
 

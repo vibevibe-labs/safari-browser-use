@@ -535,6 +535,13 @@ var run = (function (globalObject) {
     });
   };
 
+  SafariLocator.prototype.allAttributes = function (name, options) {
+    return this.call("allAttributes", {
+      name: name,
+      options: options || {}
+    });
+  };
+
   SafariLocator.prototype.getAttribute = function (name, options) {
     return this.call("getAttribute", {
       name: name,
@@ -588,6 +595,12 @@ var run = (function (globalObject) {
     return this.call("waitFor", { options: options || {} });
   };
 
+  SafariLocator.prototype.scrollIntoView = function (options) {
+    return this.call("scrollIntoView", {
+      options: options || {}
+    });
+  };
+
   function SafariPlaywright(tabId) {
     this.tabId = tabId;
   }
@@ -638,6 +651,17 @@ var run = (function (globalObject) {
   SafariPlaywright.prototype.domSnapshot = function () {
     return callSafari("playwright.domSnapshot", {
       tabId: this.tabId
+    });
+  };
+
+  SafariPlaywright.prototype.scrollBy = function (
+    deltaX,
+    deltaY
+  ) {
+    return callSafari("playwright.scrollBy", {
+      tabId: this.tabId,
+      deltaX: deltaX,
+      deltaY: deltaY
     });
   };
 

@@ -505,6 +505,18 @@ export function runPageOperation(
     return domSnapshot();
   }
 
+  if (method === "playwright.scrollBy") {
+    const deltaX = Number(params.deltaX ?? 0);
+    const deltaY = Number(params.deltaY ?? 0);
+
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+      throw new Error("invalid_scroll_offset");
+    }
+
+    window.scrollBy(deltaX, deltaY);
+    return { deltaX, deltaY };
+  }
+
   if (method === "control.show") {
     return showControlIndicator(params);
   }
@@ -534,6 +546,16 @@ export function runPageOperation(
     return matches.map(element => element.textContent ?? "");
   }
 
+  if (operation === "allAttributes") {
+    if (typeof params.name !== "string" || !params.name) {
+      throw new Error("attribute_name_required");
+    }
+
+    return matches.map(element =>
+      element.getAttribute(params.name)
+    );
+  }
+
   const element = oneLocatorElement(params.locator);
 
   switch (operation) {
@@ -553,17 +575,45 @@ export function runPageOperation(
         `${element.value ?? ""}${params.value}`
       );
       return { typed: true };
-    case "press":
+    case "press": {
+      const key = String(params.value);
+      const unsupportedDefaultActionKeys = [
+        "Tab",
+        "PageDown",
+        "PageUp",
+        "Home",
+        "End",
+        "Space",
+        " "
+      ];
+
+      if (unsupportedDefaultActionKeys.includes(key)) {
+        throw new Error(
+          "unsupported_press_default_action: " +
+          `"${key}" cannot be synthesized; use ` +
+          "tab.playwright.scrollBy() or locator.scrollIntoView()"
+        );
+      }
+
       element.focus?.();
       element.dispatchEvent(new window.KeyboardEvent("keydown", {
-        key: params.value,
+        key,
         bubbles: true
       }));
       element.dispatchEvent(new window.KeyboardEvent("keyup", {
-        key: params.value,
+        key,
         bubbles: true
       }));
-      return { pressed: true };
+      return { pressed: true, trusted: false };
+    }
+    case "scrollIntoView": {
+      const options = params.options || {};
+      element.scrollIntoView?.({
+        block: options.block || "center",
+        inline: options.inline || "nearest"
+      });
+      return { scrolled: true };
+    }
     case "innerText":
       return normalizeText(element.innerText);
     case "textContent":
