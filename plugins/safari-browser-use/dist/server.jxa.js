@@ -34,14 +34,31 @@ function runPageOperation(
     "__safari_browser_use_control_favicon_state__";
   const controlTitlePattern = /^(?:🟡|⚫) AI · /u;
 
-  function controlFaviconUrl(lit) {
-    const fill = lit ? "#ffd400" : "#ad9300";
-    const highlight = lit ? "#fff4a3" : "#dcc75d";
+  function escapeXmlAttribute(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function controlFaviconUrl(lit, sourceUrl) {
+    const color = lit ? "#ffd400" : "#ad9300";
+    const opacity = lit ? "0.92" : "0.5";
+    const blur = lit ? "2.8" : "1.4";
     const svg = [
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
-      `<circle cx="16" cy="16" r="14" fill="${fill}"`,
-      ' stroke="#4b4100" stroke-width="2"/>',
-      `<circle cx="11" cy="10" r="4" fill="${highlight}"/>`,
+      '<defs><filter id="halo" x="-50%" y="-50%" ',
+      'width="200%" height="200%">',
+      `<feGaussianBlur stdDeviation="${blur}"/>`,
+      "</filter></defs>",
+      `<circle cx="16" cy="16" r="12" fill="none" stroke="${color}"`,
+      ` stroke-width="4" opacity="${opacity}" filter="url(#halo)"/>`,
+      `<circle cx="16" cy="16" r="12" fill="none" stroke="${color}"`,
+      ` stroke-width="2" opacity="${opacity}"/>`,
+      `<image href="${escapeXmlAttribute(sourceUrl)}" x="6" y="6"`,
+      ' width="20" height="20" preserveAspectRatio="xMidYMid meet"/>',
       "</svg>"
     ].join("");
 
@@ -56,6 +73,8 @@ function runPageOperation(
       parent: link.parentNode,
       nextSibling: link.nextSibling
     }));
+    const sourceUrl = originals[0]?.link.href ||
+      new URL("/favicon.ico", document.baseURI).href;
 
     originals.forEach(({ link }) => link.remove());
 
@@ -67,7 +86,8 @@ function runPageOperation(
 
     window[controlFaviconStateKey] = {
       favicon,
-      originals
+      originals,
+      sourceUrl
     };
   }
 
@@ -75,7 +95,10 @@ function runPageOperation(
     const state = window[controlFaviconStateKey];
 
     if (state?.favicon?.isConnected) {
-      state.favicon.setAttribute("href", controlFaviconUrl(lit));
+      state.favicon.setAttribute(
+        "href",
+        controlFaviconUrl(lit, state.sourceUrl)
+      );
     }
   }
 

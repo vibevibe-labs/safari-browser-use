@@ -84,9 +84,10 @@ ambiguous locator.
 
 ## Control Indicator
 
-Selecting or operating a tab adds a non-interactive perimeter glow, flashes a
-yellow favicon that remains visible in compact Safari tabs, and prefixes its
-title with an AI marker. Each browser operation refreshes the indicators.
+Selecting or operating a tab adds a non-interactive perimeter glow, surrounds
+the original favicon with a yellow breathing halo that remains visible in
+compact Safari tabs, and prefixes its title with an AI marker. The page glow
+and favicon halo start, refresh, and stop together as one control indicator.
 
 Always remove it before the final response, including when the task finishes
 early:
