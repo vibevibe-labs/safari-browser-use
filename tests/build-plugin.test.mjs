@@ -34,6 +34,39 @@ test("builds a self-contained JXA MCP server", async t => {
     bundle,
     /SafariLocator\.prototype\.allAttributes/
   );
+  assert.match(
+    bundle,
+    /SafariLocator\.prototype\.allRecords/
+  );
+  assert.match(bundle, /function resolveTabIdentity/);
+  assert.match(
+    bundle,
+    /resolveTabIdentity\(params\.tabIdentity, listTabs\(\)\)/
+  );
+  assert.match(
+    bundle,
+    /new SafariPlaywright\(this\._identity\)/
+  );
+  assert.match(
+    bundle,
+    /SafariPlaywright\.prototype\.waitForURL/
+  );
+  assert.match(
+    bundle,
+    /SafariPlaywright\.prototype\.waitForLoadState/
+  );
+  assert.match(
+    bundle,
+    /pageState\.url === metadata\.url/
+  );
+  const waitForTimeout = bundle.match(
+    /SafariPlaywright\.prototype\.waitForTimeout[\s\S]*?\n  };/m
+  )?.[0] ?? "";
+  assert.equal(
+    (waitForTimeout.match(/controlLifecycle\.activate/g) || [])
+      .length,
+    2
+  );
   assert.doesNotMatch(
     bundle,
     /data-safari-browser-use-control-favicon/

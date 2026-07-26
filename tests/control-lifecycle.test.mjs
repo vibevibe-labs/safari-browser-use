@@ -13,6 +13,9 @@ async function createRecorder() {
     show(tabId) {
       events.push(`show:${tabId}`);
     },
+    refresh(tabId) {
+      events.push(`refresh:${tabId}`);
+    },
     hide(tabId) {
       events.push(`hide:${tabId}`);
     }
@@ -27,7 +30,7 @@ test("activating the current tab refreshes its indicator lease", async () => {
   lifecycle.activate("10:1");
   lifecycle.activate("10:1");
 
-  assert.deepEqual(events, ["show:10:1", "show:10:1"]);
+  assert.deepEqual(events, ["show:10:1", "refresh:10:1"]);
 });
 
 test("activating another tab hides the previous indicator first", async () => {

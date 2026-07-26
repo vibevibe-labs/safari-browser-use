@@ -38,6 +38,20 @@ export function runPageOperation(
   }
 
   function showControlIndicator(options) {
+    const existingIndicator = document.querySelector(
+      `[${controlIndicatorAttribute}]`
+    );
+    const existingStyle = document.getElementById(controlStyleId);
+
+    if (existingIndicator && existingStyle) {
+      window.clearTimeout(window[controlTimerKey]);
+      window[controlTimerKey] = window.setTimeout(
+        hideControlIndicator,
+        controlLeaseMs(options)
+      );
+      return { visible: true };
+    }
+
     hideControlIndicator();
 
     const style = document.createElement("style");
@@ -111,17 +125,21 @@ export function runPageOperation(
     indicator.append(cursor);
     document.documentElement.append(indicator);
 
-    const requestedLeaseMs = Number(options.leaseMs);
-    const leaseMs = Number.isFinite(requestedLeaseMs) &&
-      requestedLeaseMs > 0
-      ? Math.min(requestedLeaseMs, 300_000)
-      : 45_000;
     window[controlTimerKey] = window.setTimeout(
       hideControlIndicator,
-      leaseMs
+      controlLeaseMs(options)
     );
 
     return { visible: true };
+  }
+
+  function controlLeaseMs(options) {
+    const requestedLeaseMs = Number(options.leaseMs);
+
+    return Number.isFinite(requestedLeaseMs) &&
+      requestedLeaseMs > 0
+      ? Math.min(requestedLeaseMs, 300_000)
+      : 45_000;
   }
 
   function normalizeText(value) {
@@ -396,6 +414,17 @@ export function runPageOperation(
     return domSnapshot();
   }
 
+  if (method === "playwright.readyState") {
+    return document.readyState;
+  }
+
+  if (method === "playwright.pageState") {
+    return {
+      readyState: document.readyState,
+      url: window.location.href
+    };
+  }
+
   if (method === "playwright.scrollBy") {
     const deltaX = Number(params.deltaX ?? 0);
     const deltaY = Number(params.deltaY ?? 0);
@@ -445,6 +474,32 @@ export function runPageOperation(
     return matches.map(element =>
       element.getAttribute(params.name)
     );
+  }
+
+  if (operation === "allRecords") {
+    const fields = params.fields || {};
+
+    return matches.map(element => ({
+      textContent: element.textContent ?? "",
+      fields: Object.fromEntries(
+        Object.entries(fields).map(([name, field]) => {
+          if (
+            !field ||
+            typeof field.selector !== "string" ||
+            typeof field.attribute !== "string"
+          ) {
+            throw new Error("invalid_record_field: " + name);
+          }
+
+          return [
+            name,
+            [...element.querySelectorAll(field.selector)].map(
+              child => child.getAttribute(field.attribute)
+            )
+          ];
+        })
+      )
+    }));
   }
 
   const element = oneLocatorElement(params.locator);

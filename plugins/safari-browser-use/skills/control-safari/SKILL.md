@@ -44,6 +44,12 @@ If no matching tab is open, create a new tab and navigate it to the requested
 site. Do not inspect an unrelated current tab. Only use `browser.tabs.selected()`
 when the user explicitly asks for the current tab or provides no target.
 
+The tab binding automatically reacquires the same tab when another tab closes
+or moves and its URL is unique in the original window. The runtime never
+recovers by site alone. If recovery is ambiguous, it throws
+`stale_tab_handle`; list the tabs again and have the user confirm the intended
+tab instead of guessing.
+
 Use `var` for bindings that must persist across cells. `const` and `let`
 bindings are local to one cell.
 
@@ -56,8 +62,10 @@ bindings are local to one cell.
 4. Call `count()` when uniqueness is not obvious.
 5. Click, fill, press, check, or select only when the locator resolves to one
    element.
-6. Verify the result with a targeted read or a fresh snapshot.
-7. Call `browser.release()` after the browser task finishes or stops.
+6. After navigation, use `waitForURL()` and `waitForLoadState()` instead of a
+   fixed sleep, then verify with a targeted read or a fresh snapshot.
+7. Prefer stable URLs and `href` attributes over localized text or counters.
+8. Call `browser.release()` after the browser task finishes or stops.
 
 Example:
 
@@ -76,6 +84,7 @@ continueButton.count()
 
 ```js
 continueButton.click()
+tab.playwright.waitForLoadState()
 tab.playwright.domSnapshot()
 ```
 
@@ -96,10 +105,19 @@ var items = tab.playwright.getByTestId("UserCell")
 var seen = {}
 var stagnantRounds = 0
 for (var round = 0; round < 50 && stagnantRounds < 3; round++) {
-  var texts = items.allTextContents()
+  var records = items.allRecords({
+    fields: {
+      profileHrefs: {
+        selector: "a[href]",
+        attribute: "href"
+      }
+    }
+  })
   var before = Object.keys(seen).length
-  for (var index = 0; index < texts.length; index++) {
-    seen[texts[index]] = texts[index]
+  for (var index = 0; index < records.length; index++) {
+    var href = records[index].fields.profileHrefs[0]
+    var key = href || records[index].textContent
+    seen[key] = records[index]
   }
   stagnantRounds = Object.keys(seen).length === before
     ? stagnantRounds + 1
@@ -112,8 +130,9 @@ for (var round = 0; round < 50 && stagnantRounds < 3; round++) {
 
 Using `.last()` only to scroll the current batch is allowed; never use it to
 bypass ambiguity for clicks or other consequential actions. When no stable
-item exists, use `tab.playwright.scrollBy(0, 700)`. Use `allAttributes("href")`
-when links provide a more stable key than localized text.
+item exists, use `tab.playwright.scrollBy(0, 700)`. Use `allRecords()` when
+text and descendant attributes must remain paired per item. Prefer `href`
+values as stable keys over localized text.
 
 Do not use `press` with End, PageDown, Space, or Tab to scroll or move focus.
 Safari page JavaScript cannot synthesize their trusted browser-default

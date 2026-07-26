@@ -1,6 +1,6 @@
 {
   "name": "safari-browser-use",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Control the user's existing Safari 26 session with agent-written JavaScript.",
   "author": {
     "name": "VibeVibe Labs",
