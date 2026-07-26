@@ -110,9 +110,9 @@ test("GitHub Copilot and Cursor marketplaces publish the shared plugin directory
   }]);
 });
 
-test("installation guide covers every supported client", async () => {
+test("repository installation guide covers every supported client", async () => {
   const readme = await readFile(
-    new URL("README.md", pluginRoot),
+    new URL("README.md", repositoryRoot),
     "utf8"
   );
 
@@ -139,17 +139,25 @@ test("installation guide covers every supported client", async () => {
   );
   assert.match(readme, /Cursor/);
   assert.match(readme, /\.cursor\/plugins\/local/);
-  assert.match(readme, /Install or upgrade Safari Browser Use/);
-  assert.match(readme, /if setup or connection fails/);
+  assert.match(readme, /Only install the plugin/);
+  assert.match(readme, /When installation is complete/);
+  assert.match(readme, /example request/);
   assert.match(readme, /Allow JavaScript from Apple Events/);
   assert.match(readme, /does not\s+require Node\.js/i);
   assert.doesNotMatch(readme, /safari-browser-use@personal/);
   assert.doesNotMatch(readme, /plugin marketplace add "\$PWD"/);
+  assert.doesNotMatch(readme, /then connect it to Safari/);
+  assert.doesNotMatch(readme, /if setup or connection fails/);
   assert.doesNotMatch(readme, /npm ci|npm run build/);
   assert.doesNotMatch(readme, /\bawait\b/);
   assert.doesNotMatch(
     readme,
     /xcodeproj|signing team|Safari Settings > Extensions/i
+  );
+
+  await assert.rejects(
+    access(new URL("README.md", pluginRoot)),
+    error => error.code === "ENOENT"
   );
 });
 
@@ -173,8 +181,11 @@ test("repository quick start describes a zero-dependency synchronous REPL", asyn
 
   assert.match(readme, /does not require Node\.js/i);
   assert.match(readme, /synchronous/i);
-  assert.match(readme, /Install or upgrade Safari Browser Use/);
-  assert.match(readme, /if setup or connection fails/);
+  assert.match(readme, /Only install the plugin/);
+  assert.match(readme, /When installation is complete/);
+  assert.match(readme, /example request/);
+  assert.doesNotMatch(readme, /then connect it to Safari/);
+  assert.doesNotMatch(readme, /if setup or connection fails/);
   assert.doesNotMatch(readme, /\bawait\b/);
 });
 
