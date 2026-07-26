@@ -182,6 +182,42 @@ test("skill uses Apple Events without an extension bridge", async () => {
   assert.doesNotMatch(skill, /bridge|Safari extension/i);
 });
 
+test("skill resolves an explicitly named site before selecting a tab", async () => {
+  const skill = await readFile(
+    new URL("skills/control-safari/SKILL.md", pluginRoot),
+    "utf8"
+  );
+
+  assert.match(skill, /browser\.tabs\.list\(\)/);
+  assert.match(
+    skill,
+    /Only use `browser\.tabs\.selected\(\)`.*current tab.*no target/is
+  );
+  assert.match(skill, /Do not inspect an unrelated current tab/i);
+});
+
+test("Codex prompts defer to an explicitly named target tab", async () => {
+  const agent = await readFile(
+    new URL(
+      "skills/control-safari/agents/openai.yaml",
+      pluginRoot
+    ),
+    "utf8"
+  );
+  const manifest = await readJson(".codex-plugin/plugin.json");
+
+  assert.match(agent, /Safari tab I identify/i);
+  assert.doesNotMatch(agent, /my current Safari/i);
+  assert.match(
+    manifest.interface.defaultPrompt,
+    /Safari tab I identify/i
+  );
+  assert.doesNotMatch(
+    manifest.interface.defaultPrompt,
+    /the current page/i
+  );
+});
+
 test("runtime API documents how to release the active tab", async () => {
   const runtimeApi = await readFile(
     new URL(
@@ -193,6 +229,28 @@ test("runtime API documents how to release the active tab", async () => {
 
   assert.match(runtimeApi, /browser\.release\(\)/);
   assert.match(runtimeApi, /control indicator/i);
+});
+
+test("control indicator docs cover compact Safari tabs", async () => {
+  const documents = await Promise.all([
+    readFile(new URL("README.md", repositoryRoot), "utf8"),
+    readFile(
+      new URL("skills/control-safari/SKILL.md", pluginRoot),
+      "utf8"
+    ),
+    readFile(
+      new URL(
+        "skills/control-safari/references/runtime-api.md",
+        pluginRoot
+      ),
+      "utf8"
+    )
+  ]);
+
+  for (const document of documents) {
+    assert.match(document, /favicon/i);
+    assert.match(document, /compact Safari\s+tabs/i);
+  }
 });
 
 test("repository quick start describes a zero-dependency synchronous REPL", async () => {

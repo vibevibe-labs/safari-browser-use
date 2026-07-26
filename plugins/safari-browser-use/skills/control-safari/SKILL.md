@@ -25,12 +25,24 @@ browser.doctor()
 Stop if Safari is not version 26, `automationAvailable` is false, or
 `javascriptFromAppleEvents` is false.
 
-Select the current tab once and reuse it:
+Resolve the target tab before selecting it. If the user names a website, URL,
+or page title, list the open tabs first:
 
 ```js
-var tab = browser.tabs.selected()
+var tabs = browser.tabs.list()
+tabs
+```
+
+Use the returned metadata to get the matching tab by ID:
+
+```js
+var tab = browser.tabs.get("matching-tab-id")
 tab.playwright.domSnapshot()
 ```
+
+If no matching tab is open, create a new tab and navigate it to the requested
+site. Do not inspect an unrelated current tab. Only use `browser.tabs.selected()`
+when the user explicitly asks for the current tab or provides no target.
 
 Use `var` for bindings that must persist across cells. `const` and `let`
 bindings are local to one cell.
@@ -72,9 +84,9 @@ ambiguous locator.
 
 ## Control Indicator
 
-Selecting or operating a tab adds a non-interactive perimeter glow and flashes
-a yellow AI marker in its title. The title marker remains visible while the user
-works in another tab. Each browser operation refreshes both indicators.
+Selecting or operating a tab adds a non-interactive perimeter glow, flashes a
+yellow favicon that remains visible in compact Safari tabs, and prefixes its
+title with an AI marker. Each browser operation refreshes the indicators.
 
 Always remove it before the final response, including when the task finishes
 early:
@@ -84,8 +96,8 @@ browser.release()
 ```
 
 `js_reset` and MCP shutdown also release control. A 45-second inactivity lease
-removes stale indicators and restores the page title if the session ends
-unexpectedly.
+removes stale indicators and restores the page title and favicon if the session
+ends unexpectedly.
 
 ## Safety
 

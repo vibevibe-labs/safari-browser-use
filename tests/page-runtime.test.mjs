@@ -246,6 +246,62 @@ test("flashes a yellow light in the controlled tab title", () => {
   execute("control.hide");
 });
 
+test("flashes a yellow favicon for compact Safari tabs", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+  let blink;
+
+  window.setInterval = callback => {
+    blink = callback;
+    return 7;
+  };
+
+  execute("control.show", { leaseMs: 1000 });
+
+  const favicon = window.document.querySelector(
+    "[data-safari-browser-use-control-favicon]"
+  );
+  const litIcon = favicon.getAttribute("href");
+
+  assert.equal(favicon.getAttribute("rel"), "icon");
+  assert.match(litIcon, /^data:image\/svg\+xml,/);
+
+  blink();
+
+  const dimIcon = favicon.getAttribute("href");
+
+  assert.notEqual(dimIcon, litIcon);
+  assert.match(dimIcon, /^data:image\/svg\+xml,/);
+
+  execute("control.hide");
+});
+
+test("restores the original favicon after control ends", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+  const original = window.document.createElement("link");
+  const following = window.document.createElement("meta");
+
+  original.setAttribute("rel", "shortcut icon");
+  original.setAttribute("href", "/favicon.ico");
+  following.setAttribute("name", "theme-color");
+  window.document.head.append(original, following);
+
+  execute("control.show", { leaseMs: 1000 });
+
+  assert.equal(original.isConnected, false);
+
+  execute("control.hide");
+
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control-favicon]"
+    ),
+    null
+  );
+  assert.equal(original.isConnected, true);
+  assert.equal(original.nextSibling, following);
+  assert.equal(original.getAttribute("href"), "/favicon.ico");
+});
+
 test("restores the latest tab title after control ends", () => {
   const { execute, window } = createPage("<main>Inbox</main>");
   let blink;
