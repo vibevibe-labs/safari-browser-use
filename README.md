@@ -26,19 +26,54 @@ Safari 27 is not supported by this release.
 
 ## Installation
 
-### Setup prompt
+### Ask an agent
 
 Paste into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 
 ```text
-Install or upgrade Safari Browser Use for this client from https://github.com/vibevibe-labs/safari-browser-use using its native plugin system; do not install Node.js or build from source. Reload plugins when supported, or tell me to start a new session, then connect it to Safari 26. Ask me to enable "Allow JavaScript from Apple Events" if needed. Follow https://github.com/vibevibe-labs/safari-browser-use/blob/main/plugins/safari-browser-use/README.md#manual-installation if setup or connection fails.
+Install the Safari Browser Use plugin from https://github.com/vibevibe-labs/safari-browser-use using the current client's plugin installer. Stop after installation, then tell me whether to reload plugins or start a new session and give me one example request.
 ```
 
 ### Manual installation
 
-Follow the
-[client-specific installation guide](plugins/safari-browser-use/README.md#manual-installation)
-for Codex, Claude Code, GitHub Copilot CLI, or Cursor.
+#### Codex
+
+```sh
+codex plugin marketplace add vibevibe-labs/safari-browser-use
+codex plugin add safari-browser-use@vibevibe-labs
+```
+
+Start a new Codex task after installation.
+
+#### Claude Code
+
+```sh
+claude plugin marketplace add vibevibe-labs/safari-browser-use --scope user
+claude plugin install safari-browser-use@vibevibe-labs --scope user
+```
+
+Run `/reload-plugins` after installation.
+
+#### GitHub Copilot CLI
+
+```sh
+copilot plugin install vibevibe-labs/safari-browser-use:plugins/safari-browser-use
+```
+
+Start a new Copilot CLI session after installation.
+
+#### Cursor
+
+Until the plugin is listed in Cursor Marketplace, install it from a local
+checkout:
+
+```sh
+git clone --depth 1 https://github.com/vibevibe-labs/safari-browser-use.git
+mkdir -p "$HOME/.cursor/plugins/local"
+cp -R safari-browser-use/plugins/safari-browser-use "$HOME/.cursor/plugins/local/"
+```
+
+Restart Cursor after installation.
 
 ## Quick Start
 
@@ -89,3 +124,10 @@ tab.playwright.getByRole("button", { name: "Submit" }).click()
 Safari asks for Automation permission the first time the plugin controls it.
 Only approve that request when you intend to let the current client automate
 Safari.
+
+If Safari reports that JavaScript from Apple Events is disabled:
+
+1. Open Safari Settings > Advanced.
+2. Enable **Show features for web developers**.
+3. Open Safari Settings > Developer > Automation.
+4. Enable **Allow JavaScript from Apple Events**.
