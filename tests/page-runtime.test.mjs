@@ -204,6 +204,27 @@ test("shows one non-interactive AI control indicator", () => {
   execute("control.hide");
 });
 
+test("makes active AI control visually unmistakable", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+
+  execute("control.show", { leaseMs: 1000 });
+
+  const indicator = window.document.querySelector(
+    "[data-safari-browser-use-control]"
+  );
+  const style = window.document.getElementById(
+    "__safari_browser_use_control_style__"
+  );
+
+  assert.equal(indicator.style.borderWidth, "3px");
+  assert.equal(indicator.style.outlineWidth, "1px");
+  assert.match(indicator.style.boxShadow, /140px 28px/);
+  assert.match(style.textContent, /1300ms/);
+  assert.match(style.textContent, /opacity: 0\.64/);
+
+  execute("control.hide");
+});
+
 test("hides the AI control indicator and its styles", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
 

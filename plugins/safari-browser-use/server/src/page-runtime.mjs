@@ -41,20 +41,20 @@ export function runPageOperation(
     style.id = controlStyleId;
     style.textContent = `
       @keyframes __safari_browser_use_control_breathe__ {
-        0%, 100% { opacity: 0.72; }
+        0%, 100% { opacity: 0.64; }
         50% { opacity: 1; }
       }
 
       [${controlIndicatorAttribute}] {
         animation:
           __safari_browser_use_control_breathe__
-          1800ms cubic-bezier(0.25, 1, 0.5, 1) infinite;
+          1300ms cubic-bezier(0.25, 1, 0.5, 1) infinite;
       }
 
       @media (prefers-reduced-motion: reduce) {
         [${controlIndicatorAttribute}] {
           animation: none !important;
-          opacity: 0.9 !important;
+          opacity: 0.98 !important;
         }
       }
     `;
@@ -69,12 +69,15 @@ export function runPageOperation(
       boxSizing: "border-box",
       pointerEvents: "none",
       zIndex: "2147483647",
-      border: "2px solid rgba(188, 191, 86, 0.82)",
+      border: "3px solid rgba(194, 184, 38, 0.98)",
+      outline: "1px solid rgba(255, 252, 210, 0.92)",
+      outlineOffset: "-6px",
       borderRadius: "10px",
       boxShadow: [
-        "inset 0 0 14px rgba(255, 255, 245, 0.74)",
-        "inset 0 0 46px rgba(213, 216, 105, 0.58)",
-        "inset 0 0 110px rgba(169, 176, 70, 0.34)"
+        "inset 0 0 18px 4px rgba(255, 253, 220, 0.95)",
+        "inset 0 0 56px 14px rgba(230, 222, 82, 0.78)",
+        "inset 0 0 140px 28px rgba(183, 191, 42, 0.52)",
+        "inset 0 0 200px 42px rgba(151, 162, 34, 0.28)"
       ].join(", "),
       contain: "strict",
       willChange: "opacity"

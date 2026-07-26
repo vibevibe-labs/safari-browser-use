@@ -10,6 +10,10 @@ one synchronous JavaScript `code` cell. Bindings declared with `var` persist
 until `js_reset` is called. Browser operations use Safari's Apple Events
 interface and `do JavaScript`.
 
+If the plugin-provided `js` or `js_reset` tool is unavailable, stop and report
+that the plugin MCP server did not load. Do not fall back to another Safari
+MCP tool because it cannot provide this plugin's control indicator.
+
 ## Bootstrap
 
 Check the connection first:
