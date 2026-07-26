@@ -97,10 +97,11 @@ The agent checks the connection, selects the active tab, and reads a structured
 DOM snapshot. Variables persist between `js` calls; use `js_reset` when you
 want a clean REPL context.
 
-Selecting or operating a tab adds a non-interactive perimeter glow so you
-always know which page is under agent control. The indicator is removed with
-`browser.release()` when the task ends and clears automatically after 45
-seconds without tab activity.
+Selecting or operating a tab adds a non-interactive perimeter glow and flashes
+a yellow AI marker in the tab title, so you can identify the controlled page
+while working in another tab. The indicators are removed with
+`browser.release()` when the task ends and clear automatically after 45 seconds
+without tab activity.
 
 ## Highlights
 
@@ -109,7 +110,7 @@ seconds without tab activity.
 | 🌐 Existing Safari session | Work with your open tabs, cookies, and signed-in state |
 | ⚡ Persistent synchronous REPL | Reuse variables and browser state across tool calls |
 | 🎭 Playwright-style API | Locate elements by role, label, text, test ID, or attribute |
-| ✨ Visible control indicator | See a perimeter glow around the tab controlled by the agent |
+| ✨ Visible control indicator | See a perimeter glow and flashing yellow marker on the controlled tab |
 | 🔌 Native agent plugins | Install directly in Codex, Claude Code, GitHub Copilot, or Cursor |
 | 🛡️ Deliberate interactions | Inspect first, target unique elements, and verify every action |
 

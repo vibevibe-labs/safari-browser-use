@@ -225,6 +225,50 @@ test("makes active AI control visually unmistakable", () => {
   execute("control.hide");
 });
 
+test("flashes a yellow light in the controlled tab title", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+  let blink;
+
+  window.document.title = "Dashboard";
+  window.setInterval = callback => {
+    blink = callback;
+    return 7;
+  };
+
+  execute("control.show", { leaseMs: 1000 });
+
+  assert.equal(window.document.title, "🟡 AI · Dashboard");
+  blink();
+  assert.equal(window.document.title, "⚫ AI · Dashboard");
+  blink();
+  assert.equal(window.document.title, "🟡 AI · Dashboard");
+
+  execute("control.hide");
+});
+
+test("restores the latest tab title after control ends", () => {
+  const { execute, window } = createPage("<main>Inbox</main>");
+  let blink;
+  let clearedInterval;
+
+  window.document.title = "Inbox";
+  window.setInterval = callback => {
+    blink = callback;
+    return 9;
+  };
+  window.clearInterval = interval => {
+    clearedInterval = interval;
+  };
+
+  execute("control.show", { leaseMs: 1000 });
+  window.document.title = "Updated Inbox";
+  blink();
+  execute("control.hide");
+
+  assert.equal(window.document.title, "Updated Inbox");
+  assert.equal(clearedInterval, 9);
+});
+
 test("hides the AI control indicator and its styles", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
 
