@@ -1,0 +1,4 @@
+interface:
+  display_name: "Control Safari"
+  short_description: "Control Safari 26 through a persistent JS REPL"
+  default_prompt: "Use $control-safari to inspect and operate my current Safari 26 tab."

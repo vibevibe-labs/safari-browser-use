@@ -1,0 +1,23 @@
+{
+  "name": "safari-browser-use",
+  "version": "0.1.0",
+  "description": "Control the user's existing Safari 26 session with agent-written JavaScript.",
+  "author": {
+    "name": "VibeVibe Labs",
+    "url": "https://github.com/vibevibe-labs"
+  },
+  "repository": "https://github.com/vibevibe-labs/safari-browser-use",
+  "keywords": [
+    "safari",
+    "browser-automation",
+    "mcp"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "safari",
+    "browser",
+    "automation"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./copilot.mcp.json"
+}

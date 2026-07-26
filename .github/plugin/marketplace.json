@@ -1,0 +1,18 @@
+{
+  "name": "vibevibe-labs",
+  "owner": {
+    "name": "VibeVibe Labs"
+  },
+  "metadata": {
+    "description": "Safari 26 browser automation plugins from VibeVibe Labs.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "safari-browser-use",
+      "source": "./plugins/safari-browser-use",
+      "description": "Control the user's existing Safari 26 session with agent-written JavaScript.",
+      "version": "0.1.0"
+    }
+  ]
+}
