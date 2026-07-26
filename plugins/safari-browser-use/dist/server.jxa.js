@@ -28,7 +28,79 @@ function runPageOperation(
     "__safari_browser_use_control_title_timer__";
   const controlTitleBaseKey =
     "__safari_browser_use_control_title_base__";
+  const controlFaviconAttribute =
+    "data-safari-browser-use-control-favicon";
+  const controlFaviconStateKey =
+    "__safari_browser_use_control_favicon_state__";
   const controlTitlePattern = /^(?:🟡|⚫) AI · /u;
+
+  function controlFaviconUrl(lit) {
+    const fill = lit ? "#ffd400" : "#ad9300";
+    const highlight = lit ? "#fff4a3" : "#dcc75d";
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
+      `<circle cx="16" cy="16" r="14" fill="${fill}"`,
+      ' stroke="#4b4100" stroke-width="2"/>',
+      `<circle cx="11" cy="10" r="4" fill="${highlight}"/>`,
+      "</svg>"
+    ].join("");
+
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+
+  function showControlFavicon() {
+    const originals = Array.from(
+      document.querySelectorAll('link[rel~="icon"]')
+    ).map(link => ({
+      link,
+      parent: link.parentNode,
+      nextSibling: link.nextSibling
+    }));
+
+    originals.forEach(({ link }) => link.remove());
+
+    const favicon = document.createElement("link");
+    favicon.setAttribute("rel", "icon");
+    favicon.setAttribute("type", "image/svg+xml");
+    favicon.setAttribute(controlFaviconAttribute, "");
+    (document.head || document.documentElement).append(favicon);
+
+    window[controlFaviconStateKey] = {
+      favicon,
+      originals
+    };
+  }
+
+  function updateControlFavicon(lit) {
+    const state = window[controlFaviconStateKey];
+
+    if (state?.favicon?.isConnected) {
+      state.favicon.setAttribute("href", controlFaviconUrl(lit));
+    }
+  }
+
+  function restoreControlFavicon() {
+    const state = window[controlFaviconStateKey];
+
+    if (!state) {
+      return;
+    }
+
+    state.favicon?.remove();
+
+    for (let index = state.originals.length - 1; index >= 0; index--) {
+      const { link, parent, nextSibling } = state.originals[index];
+
+      if (!link.isConnected && parent?.isConnected) {
+        const reference = nextSibling?.parentNode === parent
+          ? nextSibling
+          : null;
+        parent.insertBefore(link, reference);
+      }
+    }
+
+    delete window[controlFaviconStateKey];
+  }
 
   function updateControlTitle(lit) {
     if (!controlTitlePattern.test(document.title)) {
@@ -58,6 +130,7 @@ function runPageOperation(
       `[${controlIndicatorAttribute}]`
     )?.remove();
     document.getElementById(controlStyleId)?.remove();
+    restoreControlFavicon();
 
     return { visible: false };
   }
@@ -112,14 +185,17 @@ function runPageOperation(
     });
     document.documentElement.append(indicator);
 
+    showControlFavicon();
     window[controlTitleBaseKey] = document.title;
     updateControlTitle(true);
+    updateControlFavicon(true);
 
     if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
       let lit = true;
       window[controlTitleTimerKey] = window.setInterval(() => {
         lit = !lit;
         updateControlTitle(lit);
+        updateControlFavicon(lit);
       }, 900);
     }
 

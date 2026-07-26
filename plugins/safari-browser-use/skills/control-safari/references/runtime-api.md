@@ -39,9 +39,10 @@ reordering.
 ## Control Indicator
 
 Selecting a tab or calling one of its browser methods displays a non-interactive
-perimeter glow and flashes a yellow AI marker in the tab title. Call
-`browser.release()` when the browser task finishes. Both indicators are removed
-and the title is restored by `js_reset`, MCP shutdown, or 45 seconds without
+perimeter glow, flashes a yellow favicon that remains visible in compact Safari
+tabs, and prefixes the title with an AI marker. Call `browser.release()` when
+the browser task finishes. The indicators are removed and the original title
+and favicon are restored by `js_reset`, MCP shutdown, or 45 seconds without
 activity on that tab.
 
 ## Locator Builders
