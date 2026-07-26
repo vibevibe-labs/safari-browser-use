@@ -1,0 +1,14 @@
+{
+  "name": "safari-browser-use",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-plugin.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "happy-dom": "20.11.1"
+  }
+}

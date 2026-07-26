@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "safari-browser-use": {
+      "command": "/usr/bin/osascript",
+      "args": [
+        "-l",
+        "JavaScript",
+        "${CLAUDE_PLUGIN_ROOT}/dist/server.jxa.js"
+      ]
+    }
+  }
+}
