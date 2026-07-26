@@ -73,6 +73,15 @@ test("the Claude marketplace publishes the shared plugin directory", async () =>
   }]);
 });
 
+test("the Codex marketplace uses the public publisher name", async () => {
+  const marketplace = await readRepositoryJson(
+    ".agents/plugins/marketplace.json"
+  );
+
+  assert.equal(marketplace.name, "vibevibe-labs");
+  assert.equal(marketplace.interface.displayName, "VibeVibe Labs");
+});
+
 test("GitHub Copilot and Cursor marketplaces publish the shared plugin directory", async () => {
   const copilot = await readRepositoryJson(
     ".github/plugin/marketplace.json"
@@ -108,11 +117,34 @@ test("installation guide covers every supported client", async () => {
   );
 
   assert.match(readme, /GitHub Copilot/);
-  assert.match(readme, /copilot plugin marketplace add/);
+  assert.match(
+    readme,
+    /codex plugin marketplace add vibevibe-labs\/safari-browser-use/
+  );
+  assert.match(
+    readme,
+    /codex plugin add safari-browser-use@vibevibe-labs/
+  );
+  assert.match(
+    readme,
+    /claude plugin marketplace add vibevibe-labs\/safari-browser-use/
+  );
+  assert.match(
+    readme,
+    /claude plugin install safari-browser-use@vibevibe-labs/
+  );
+  assert.match(
+    readme,
+    /copilot plugin install vibevibe-labs\/safari-browser-use:plugins\/safari-browser-use/
+  );
   assert.match(readme, /Cursor/);
   assert.match(readme, /\.cursor\/plugins\/local/);
+  assert.match(readme, /Install or upgrade Safari Browser Use/);
+  assert.match(readme, /if setup or connection fails/);
   assert.match(readme, /Allow JavaScript from Apple Events/);
   assert.match(readme, /does not\s+require Node\.js/i);
+  assert.doesNotMatch(readme, /safari-browser-use@personal/);
+  assert.doesNotMatch(readme, /plugin marketplace add "\$PWD"/);
   assert.doesNotMatch(readme, /npm ci|npm run build/);
   assert.doesNotMatch(readme, /\bawait\b/);
   assert.doesNotMatch(
@@ -141,6 +173,8 @@ test("repository quick start describes a zero-dependency synchronous REPL", asyn
 
   assert.match(readme, /does not require Node\.js/i);
   assert.match(readme, /synchronous/i);
+  assert.match(readme, /Install or upgrade Safari Browser Use/);
+  assert.match(readme, /if setup or connection fails/);
   assert.doesNotMatch(readme, /\bawait\b/);
 });
 

@@ -1,7 +1,7 @@
 {
-  "name": "personal",
+  "name": "vibevibe-labs",
   "interface": {
-    "displayName": "Personal"
+    "displayName": "VibeVibe Labs"
   },
   "plugins": [
     {

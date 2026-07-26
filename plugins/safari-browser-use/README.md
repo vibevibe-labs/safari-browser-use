@@ -1,23 +1,8 @@
 <div align="center">
-  <img src="assets/vibevibe-labs-icon.jpg" alt="VibeVibe Labs" width="112" height="112">
-  <h1>Safari Browser Use Plugin</h1>
-  <p><strong>Let AI agents control the Safari session you already use.</strong></p>
-  <p>
-    <a href="#supported-agents">Supported Agents</a>
-    ·
-    <a href="#requirements">Requirements</a>
-    ·
-    <a href="#installation">Installation</a>
-    ·
-    <a href="#quick-start">Quick Start</a>
-  </p>
-  <p>
-    <code>Codex</code>
-    <code>Claude Code</code>
-    <code>GitHub Copilot CLI</code>
-    <code>Cursor Agent</code>
-  </p>
+  <img src="assets/safari-browser-use-hero.png" alt="Safari Browser Use by VibeVibe Labs" width="100%">
 </div>
+
+# Safari Browser Use Plugin
 
 Control existing Safari 26 tabs from Codex, Claude Code, GitHub Copilot, or
 Cursor with a persistent JavaScript REPL and a Playwright-style browser API.
@@ -43,66 +28,67 @@ Safari 27 is not supported by this release.
 
 ## Installation
 
-### Option 1: Ask an agent to install it
+### Setup prompt
 
-Send this single instruction to Codex, Claude Code, GitHub Copilot, or Cursor:
+Paste into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 
-> Install and register Safari Browser Use from https://github.com/vibevibe-labs/safari-browser-use for the current client, guide me through enabling JavaScript from Apple Events in Safari, restart the client if needed, and verify the setup with `browser.doctor()`.
-
-The agent can complete the repository and client installation steps. Safari
-and macOS permission prompts still require your confirmation.
-
-### Option 2: Install it manually
-
-#### 1. Clone
-
-```sh
-git clone https://github.com/vibevibe-labs/safari-browser-use.git
-cd safari-browser-use
+```text
+Install or upgrade Safari Browser Use for this client from https://github.com/vibevibe-labs/safari-browser-use using its native plugin system; do not install Node.js or build from source. Reload plugins when supported, or tell me to start a new session, then connect it to Safari 26. Ask me to enable "Allow JavaScript from Apple Events" if needed. Follow https://github.com/vibevibe-labs/safari-browser-use/blob/main/plugins/safari-browser-use/README.md#manual-installation if setup or connection fails.
 ```
 
-#### 2. Configure Safari
+Safari and macOS permission prompts still require your confirmation.
+
+### Manual installation
+
+#### Codex
+
+```sh
+codex plugin marketplace add vibevibe-labs/safari-browser-use
+codex plugin add safari-browser-use@vibevibe-labs
+```
+
+Start a new Codex task after installation.
+
+#### Claude Code
+
+```sh
+claude plugin marketplace add vibevibe-labs/safari-browser-use --scope user
+claude plugin install safari-browser-use@vibevibe-labs --scope user
+```
+
+Run `/reload-plugins` after installation.
+
+#### GitHub Copilot CLI
+
+```sh
+copilot plugin install vibevibe-labs/safari-browser-use:plugins/safari-browser-use
+```
+
+Start a new Copilot CLI session after installation.
+
+#### Cursor
+
+Until the plugin is listed in Cursor Marketplace, install it from a local
+checkout:
+
+```sh
+git clone --depth 1 https://github.com/vibevibe-labs/safari-browser-use.git
+mkdir -p "$HOME/.cursor/plugins/local"
+cp -R safari-browser-use/plugins/safari-browser-use "$HOME/.cursor/plugins/local/"
+```
+
+Restart Cursor after installation.
+
+#### Connect Safari
 
 1. Open Safari Settings > Advanced.
 2. Enable **Show features for web developers**.
 3. Open Safari Settings > Developer > Automation.
 4. Enable **Allow JavaScript from Apple Events**.
+5. Open at least one Safari window.
 
-#### 3. Install the plugin
+In the new or reloaded agent session, ask it to use the `js` MCP tool:
 
-For Codex:
-
-```sh
-codex plugin marketplace add "$PWD"
-codex plugin add safari-browser-use@personal
-```
-
-For Claude Code:
-
-```sh
-claude plugin marketplace add "$PWD" --scope user
-claude plugin install safari-browser-use@vibevibe-labs --scope user
-```
-
-For GitHub Copilot CLI:
-
-```sh
-copilot plugin marketplace add "$PWD"
-copilot plugin install safari-browser-use@vibevibe-labs
-```
-
-For Cursor, copy the plugin into Cursor's local plugin directory:
-
-```sh
-mkdir -p "$HOME/.cursor/plugins/local"
-cp -R "$PWD/plugins/safari-browser-use" "$HOME/.cursor/plugins/local/"
-```
-
-Restart the client after installation so the MCP server and skill are loaded.
-
-#### 4. Approve Automation access and verify
-
-Open at least one Safari window, then ask the client to use the `js` MCP tool:
 
 ```json
 {
