@@ -82,6 +82,43 @@ tab.playwright.domSnapshot()
 Do not guess selectors or use `.first()`, `.last()`, or `.nth()` to bypass an
 ambiguous locator.
 
+## Virtualized and Infinite Lists
+
+Virtualized lists only keep the current batch of items in the DOM. Collect them
+in a bounded loop: deduplicate stable text or attributes, scroll the last
+current item into view, wait briefly for replacement items, and stop after a
+known total or three consecutive rounds with no new keys.
+
+Use `scrollIntoView()` when there is a stable item locator:
+
+```js
+var items = tab.playwright.getByTestId("UserCell")
+var seen = {}
+var stagnantRounds = 0
+for (var round = 0; round < 50 && stagnantRounds < 3; round++) {
+  var texts = items.allTextContents()
+  var before = Object.keys(seen).length
+  for (var index = 0; index < texts.length; index++) {
+    seen[texts[index]] = texts[index]
+  }
+  stagnantRounds = Object.keys(seen).length === before
+    ? stagnantRounds + 1
+    : 0
+  if (items.count() === 0 || stagnantRounds >= 3) break
+  items.last().scrollIntoView({ block: "end" })
+  tab.playwright.waitForTimeout(600)
+}
+```
+
+Using `.last()` only to scroll the current batch is allowed; never use it to
+bypass ambiguity for clicks or other consequential actions. When no stable
+item exists, use `tab.playwright.scrollBy(0, 700)`. Use `allAttributes("href")`
+when links provide a more stable key than localized text.
+
+Do not use `press` with End, PageDown, Space, or Tab to scroll or move focus.
+Safari page JavaScript cannot synthesize their trusted browser-default
+behavior, so the runtime rejects them instead of reporting false success.
+
 ## Control Indicator
 
 Selecting or operating a tab adds a non-interactive perimeter glow, surrounds

@@ -231,6 +231,32 @@ test("runtime API documents how to release the active tab", async () => {
   assert.match(runtimeApi, /control indicator/i);
 });
 
+test("skill documents bounded virtualized-list collection", async () => {
+  const [skill, runtimeApi] = await Promise.all([
+    readFile(
+      new URL("skills/control-safari/SKILL.md", pluginRoot),
+      "utf8"
+    ),
+    readFile(
+      new URL(
+        "skills/control-safari/references/runtime-api.md",
+        pluginRoot
+      ),
+      "utf8"
+    )
+  ]);
+
+  assert.match(skill, /virtualized/i);
+  assert.match(skill, /scrollIntoView/);
+  assert.match(skill, /scrollBy/);
+  assert.match(skill, /three consecutive/i);
+  assert.doesNotMatch(skill, /press\(["'](?:End|PageDown|Space|Tab)/);
+  assert.match(runtimeApi, /scrollIntoView/);
+  assert.match(runtimeApi, /scrollBy/);
+  assert.match(runtimeApi, /allAttributes/);
+  assert.match(runtimeApi, /synthetic/i);
+});
+
 test("control indicator docs cover compact Safari tabs", async () => {
   const documents = await Promise.all([
     readFile(new URL("README.md", repositoryRoot), "utf8"),

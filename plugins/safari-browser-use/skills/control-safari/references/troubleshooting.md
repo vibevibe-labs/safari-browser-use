@@ -19,6 +19,13 @@ Check, in order:
 
 Do not attempt to change these settings without the user's knowledge.
 
+## Unsupported Press Default Action
+
+Safari page JavaScript cannot synthesize trusted browser-default behavior for
+Tab, PageDown, PageUp, Home, End, or Space. Use
+`tab.playwright.scrollBy(...)` or `locator.scrollIntoView(...)` for scrolling,
+and use a direct locator action instead of keyboard focus traversal.
+
 ## Control Indicator Remains Visible
 
 Call `browser.release()` to remove the active tab's perimeter glow and restore

@@ -22,6 +22,18 @@ test("builds a self-contained JXA MCP server", async t => {
   assert.match(bundle, /safari-browser-use/);
   assert.match(bundle, /function runPageOperation/);
   assert.match(bundle, /Application\("Safari"\)/);
+  assert.match(
+    bundle,
+    /SafariPlaywright\.prototype\.scrollBy/
+  );
+  assert.match(
+    bundle,
+    /SafariLocator\.prototype\.scrollIntoView/
+  );
+  assert.match(
+    bundle,
+    /SafariLocator\.prototype\.allAttributes/
+  );
   assert.doesNotMatch(bundle, /\bimport\s/);
   assert.doesNotMatch(bundle, /\brequire\s*\(/);
   assert.doesNotMatch(bundle, /node:/);

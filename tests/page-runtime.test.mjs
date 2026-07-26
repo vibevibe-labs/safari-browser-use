@@ -182,6 +182,121 @@ test("reports locator state synchronously for JXA-side polling", () => {
   );
 });
 
+test("scrolls the page by explicit offsets", () => {
+  const { execute, window } = createPage("<main>Feed</main>");
+  let received;
+  window.scrollBy = (deltaX, deltaY) => {
+    received = [deltaX, deltaY];
+  };
+
+  assert.deepEqual(
+    execute("playwright.scrollBy", {
+      deltaX: 20,
+      deltaY: 640
+    }),
+    {
+      deltaX: 20,
+      deltaY: 640
+    }
+  );
+  assert.deepEqual(received, [20, 640]);
+});
+
+test("scrolls one locator into view without clicking it", () => {
+  const { execute, window } = createPage(`
+    <button data-testid="load-more">Load more</button>
+  `);
+  const button = window.document.querySelector("button");
+  let scrollOptions;
+  let clicks = 0;
+  button.scrollIntoView = options => {
+    scrollOptions = options;
+  };
+  button.addEventListener("click", () => clicks++);
+
+  assert.deepEqual(
+    execute("playwright.locator.scrollIntoView", {
+      locator: [{
+        type: "testId",
+        testId: "load-more"
+      }],
+      options: {
+        block: "end",
+        inline: "nearest"
+      }
+    }),
+    { scrolled: true }
+  );
+  assert.deepEqual(scrollOptions, {
+    block: "end",
+    inline: "nearest"
+  });
+  assert.equal(clicks, 0);
+});
+
+test("returns one attribute value for every locator match", () => {
+  const { execute } = createPage(`
+    <a href="/one">One</a>
+    <a>Two</a>
+  `);
+
+  assert.deepEqual(
+    execute("playwright.locator.allAttributes", {
+      locator: [{
+        type: "css",
+        selector: "a"
+      }],
+      name: "href"
+    }),
+    ["/one", null]
+  );
+});
+
+test("rejects keys whose browser-default behavior cannot be synthesized", () => {
+  const { execute, window } = createPage(`
+    <button data-testid="item">Item</button>
+  `);
+  let keydowns = 0;
+  window.document.querySelector("button").addEventListener(
+    "keydown",
+    () => keydowns++
+  );
+
+  assert.throws(
+    () => execute("playwright.locator.press", {
+      locator: [{
+        type: "testId",
+        testId: "item"
+      }],
+      value: "PageDown",
+      options: {}
+    }),
+    /unsupported_press_default_action.*scrollBy/
+  );
+  assert.equal(keydowns, 0);
+});
+
+test("reports supported key events as synthetic", () => {
+  const { execute } = createPage(`
+    <input data-testid="search">
+  `);
+
+  assert.deepEqual(
+    execute("playwright.locator.press", {
+      locator: [{
+        type: "testId",
+        testId: "search"
+      }],
+      value: "Enter",
+      options: {}
+    }),
+    {
+      pressed: true,
+      trusted: false
+    }
+  );
+});
+
 test("shows one non-interactive AI control indicator", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
 
