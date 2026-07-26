@@ -26,6 +26,10 @@ const controlLifecyclePath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/control-lifecycle.mjs"
 );
+const tabIdentityPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/tab-identity.mjs"
+);
 const defaultOutfile = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/dist/server.jxa.js"
@@ -37,13 +41,15 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     pageRuntime,
     safariVersion,
     toolDefinitions,
-    controlLifecycle
+    controlLifecycle,
+    tabIdentity
   ] = await Promise.all([
     readFile(templatePath, "utf8"),
     readFile(pageRuntimePath, "utf8"),
     readFile(safariVersionPath, "utf8"),
     readFile(toolDefinitionsPath, "utf8"),
-    readFile(controlLifecyclePath, "utf8")
+    readFile(controlLifecyclePath, "utf8"),
+    readFile(tabIdentityPath, "utf8")
   ]);
   const withoutExports = source =>
     source.replace(/^export\s+/gm, "");
@@ -63,6 +69,10 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     .replace(
       "/*__SBU_CONTROL_LIFECYCLE__*/",
       withoutExports(controlLifecycle)
+    )
+    .replace(
+      "/*__SBU_TAB_IDENTITY__*/",
+      withoutExports(tabIdentity)
     );
 
   await writeFile(outfile, output);

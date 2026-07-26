@@ -182,6 +182,38 @@ test("reports locator state synchronously for JXA-side polling", () => {
   );
 });
 
+test("reports the document readiness state for navigation waits", () => {
+  const { execute, window } = createPage("<main>Ready</main>");
+
+  Object.defineProperty(window.document, "readyState", {
+    configurable: true,
+    value: "interactive"
+  });
+
+  assert.equal(
+    execute("playwright.readyState"),
+    "interactive"
+  );
+});
+
+test("reports the loaded document URL with its readiness state", () => {
+  const { execute, window } = createPage("<main>Ready</main>");
+
+  Object.defineProperty(window.document, "readyState", {
+    configurable: true,
+    value: "complete"
+  });
+  window.history.replaceState({}, "", "/dashboard");
+
+  assert.deepEqual(
+    execute("playwright.pageState"),
+    {
+      readyState: "complete",
+      url: "https://example.com/dashboard"
+    }
+  );
+});
+
 test("scrolls the page by explicit offsets", () => {
   const { execute, window } = createPage("<main>Feed</main>");
   let received;
@@ -252,6 +284,53 @@ test("returns one attribute value for every locator match", () => {
   );
 });
 
+test("keeps descendant fields paired with each list item", () => {
+  const { execute } = createPage(`
+    <div data-testid="UserCell">
+      <a href="/alpha">Alpha</a>
+    </div>
+    <div data-testid="UserCell">
+      <a href="/beta">Beta</a>
+      <button aria-label="Following @beta">Following</button>
+    </div>
+  `);
+
+  assert.deepEqual(
+    execute("playwright.locator.allRecords", {
+      locator: [{
+        type: "testId",
+        testId: "UserCell"
+      }],
+      fields: {
+        profileHrefs: {
+          selector: "a[href]",
+          attribute: "href"
+        },
+        actionLabels: {
+          selector: "button",
+          attribute: "aria-label"
+        }
+      }
+    }),
+    [
+      {
+        textContent: "\n      Alpha\n    ",
+        fields: {
+          profileHrefs: ["/alpha"],
+          actionLabels: []
+        }
+      },
+      {
+        textContent: "\n      Beta\n      Following\n    ",
+        fields: {
+          profileHrefs: ["/beta"],
+          actionLabels: ["Following @beta"]
+        }
+      }
+    ]
+  );
+});
+
 test("rejects keys whose browser-default behavior cannot be synthesized", () => {
   const { execute, window } = createPage(`
     <button data-testid="item">Item</button>
@@ -301,6 +380,9 @@ test("shows one non-interactive AI control indicator", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
 
   execute("control.show", { leaseMs: 1000 });
+  const original = window.document.querySelector(
+    "[data-safari-browser-use-control]"
+  );
   execute("control.show", { leaseMs: 1000 });
 
   const indicators = window.document.querySelectorAll(
@@ -312,6 +394,7 @@ test("shows one non-interactive AI control indicator", () => {
   );
 
   assert.equal(indicators.length, 1);
+  assert.equal(indicator, original);
   assert.equal(indicator.style.pointerEvents, "none");
   assert.equal(indicator.getAttribute("aria-hidden"), "true");
   assert.match(style.textContent, /prefers-reduced-motion/);

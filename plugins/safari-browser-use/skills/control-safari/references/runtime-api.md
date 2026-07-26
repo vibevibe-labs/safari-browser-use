@@ -31,11 +31,26 @@ Cells are synchronous. The value of the final expression is returned.
 | `tab.close()` | Close the tab |
 | `tab.playwright.domSnapshot()` | Read a semantic DOM snapshot |
 | `tab.playwright.scrollBy(deltaX, deltaY)` | Scroll the page by explicit pixel offsets |
-| `tab.playwright.waitForTimeout(ms)` | Wait for a fixed duration |
+| `tab.playwright.waitForURL(expected, options?)` | Wait for a URL substring, or an exact URL with `{ exact: true }` |
+| `tab.playwright.waitForLoadState(options?)` | Wait for `complete`, or `{ state: "interactive" }` |
+| `tab.playwright.waitForTimeout(ms)` | Wait for a fixed duration, capped at 30 seconds |
 
-Safari tab coordinates can change when tabs are moved or closed. Reacquire the
-tab with `browser.tabs.selected()` or `browser.tabs.get(id)` after manual tab
-reordering.
+Safari tab coordinates can change when tabs are moved or closed. A `Tab`
+automatically reacquires its target when its URL is unique in the original
+window. It never recovers by origin alone. Ambiguous or missing targets throw
+`stale_tab_handle`; call `browser.tabs.list()` and explicitly select the
+intended tab instead of retrying against the old coordinate.
+
+After an action that navigates, prefer observable waits:
+
+```js
+tab.goto("https://example.com/dashboard")
+tab.playwright.waitForURL("example.com/dashboard")
+tab.playwright.waitForLoadState()
+```
+
+Both waits accept `{ timeoutMs }` up to 30 seconds. Successful navigation waits
+also restore the control indicator in the new document.
 
 ## Control Indicator
 
@@ -78,6 +93,7 @@ var buy = card.getByRole("button", { name: "Buy", exact: true })
 | `textContent(options?)` | Read raw text content |
 | `allTextContents(options?)` | Read text for every match |
 | `allAttributes(name, options?)` | Read one attribute for every match |
+| `allRecords(options?)` | Read each match with paired descendant fields |
 | `getAttribute(name, options?)` | Read one attribute |
 | `isVisible()` | Check visibility |
 | `isEnabled()` | Check whether the control is enabled |
@@ -98,8 +114,20 @@ and direct locator actions for interaction.
 For virtualized or infinite lists, collect and deduplicate the current batch,
 call `last().scrollIntoView({ block: "end" })`, wait briefly, and repeat with a
 fixed round limit. Stop after reaching a known total or three consecutive
-rounds without new stable keys. Use `allAttributes("href")` when link targets
-are more stable than visible text.
+rounds without new stable keys. Use `allRecords()` when values from descendant
+elements must remain associated with their containing item:
+
+```js
+var records = items.allRecords({
+  fields: {
+    links: { selector: "a[href]", attribute: "href" }
+  }
+})
+```
+
+Each result has `{ textContent, fields }`; every field is an array because one
+item can contain multiple descendants. Prefer stable `href` values over
+localized text when deduplicating.
 
 ## Persistent State
 

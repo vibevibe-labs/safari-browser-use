@@ -8,6 +8,8 @@ ObjC.import("Foundation");
 
 /*__SBU_CONTROL_LIFECYCLE__*/
 
+/*__SBU_TAB_IDENTITY__*/
+
 var run = (function (globalObject) {
   var foundation = $;
   var safari = Application("Safari");
@@ -248,6 +250,16 @@ var run = (function (globalObject) {
         // The indicator must never block the browser operation.
       }
     },
+    refresh: function (tabId) {
+      try {
+        runPage("control.show", {
+          tabId: tabId,
+          leaseMs: 45000
+        });
+      } catch (error) {
+        // Navigation may be replacing the page document.
+      }
+    },
     hide: function (tabId) {
       try {
         runPage("control.hide", { tabId: tabId });
@@ -281,9 +293,114 @@ var run = (function (globalObject) {
     throw new Error("locator_wait_timeout: " + state);
   }
 
+  function waitForURL(params) {
+    var options = params.options || {};
+    var expected = String(params.expected);
+    var exact = options.exact === true;
+    var timeoutMs = Math.min(
+      options.timeoutMs === undefined ? 10000 : options.timeoutMs,
+      30000
+    );
+    var deadline = Date.now() + timeoutMs;
+
+    while (Date.now() <= deadline) {
+      var candidates = listTabs().filter(function (tab) {
+        if (
+          tabWindowId(tab.id) !== params.tabIdentity.windowId
+        ) {
+          return false;
+        }
+
+        var url = String(tab.url || "");
+        return exact
+          ? url === expected
+          : url.indexOf(expected) !== -1;
+      });
+
+      if (candidates.length === 1) {
+        updateTabIdentity(params.tabIdentity, candidates[0]);
+        controlLifecycle.activate(candidates[0].id);
+        return {
+          matched: true,
+          url: candidates[0].url
+        };
+      }
+
+      if (candidates.length > 1) {
+        throw new Error(
+          "stale_tab_handle: ambiguous URL candidates"
+        );
+      }
+
+      foundation.NSThread.sleepForTimeInterval(0.05);
+    }
+
+    throw new Error("url_wait_timeout: " + expected);
+  }
+
+  function waitForLoadState(params) {
+    var options = params.options || {};
+    var state = options.state || "complete";
+    var timeoutMs = Math.min(
+      options.timeoutMs === undefined ? 10000 : options.timeoutMs,
+      30000
+    );
+    var deadline = Date.now() + timeoutMs;
+
+    if (state !== "interactive" && state !== "complete") {
+      throw new Error("unsupported_load_state: " + state);
+    }
+
+    while (Date.now() <= deadline) {
+      var metadata = resolveTabIdentity(
+        params.tabIdentity,
+        listTabs()
+      );
+
+      try {
+        var pageState = runPage("playwright.pageState", {
+          tabId: metadata.id
+        });
+        var matched = pageState.url === metadata.url &&
+          (
+            pageState.readyState === "complete" ||
+            state === "interactive" &&
+              pageState.readyState === "interactive"
+          );
+
+        if (matched) {
+          controlLifecycle.activate(metadata.id);
+          return {
+            matched: true,
+            state: pageState.readyState
+          };
+        }
+      } catch (error) {
+        // Safari can reject page JavaScript while replacing a document.
+      }
+
+      foundation.NSThread.sleepForTimeInterval(0.05);
+    }
+
+    throw new Error("load_state_timeout: " + state);
+  }
+
   function callSafari(method, params) {
     ensureSafari26();
     params = params || {};
+
+    if (method === "playwright.waitForURL") {
+      return waitForURL(params);
+    }
+
+    if (method === "playwright.waitForLoadState") {
+      return waitForLoadState(params);
+    }
+
+    if (params.tabIdentity) {
+      resolveTabIdentity(params.tabIdentity, listTabs());
+      params.tabId = params.tabIdentity.id;
+    }
 
     if (params.tabId && method !== "tabs.close") {
       controlLifecycle.activate(params.tabId);
@@ -314,6 +431,7 @@ var run = (function (globalObject) {
       }
 
       findTab(params.tabId).tab.url = url;
+      retargetTabIdentity(params.tabIdentity, url);
       return null;
     }
 
@@ -400,14 +518,14 @@ var run = (function (globalObject) {
     return result;
   }
 
-  function SafariLocator(tabId, steps) {
-    this.tabId = tabId;
+  function SafariLocator(tabIdentity, steps) {
+    this.tabIdentity = tabIdentity;
     this.steps = steps;
   }
 
   SafariLocator.prototype.append = function (step) {
     return new SafariLocator(
-      this.tabId,
+      this.tabIdentity,
       this.steps.concat([step])
     );
   };
@@ -481,7 +599,7 @@ var run = (function (globalObject) {
 
   SafariLocator.prototype.call = function (operation, params) {
     params = params || {};
-    params.tabId = this.tabId;
+    params.tabIdentity = this.tabIdentity;
     params.locator = this.steps;
 
     return callSafari(
@@ -539,6 +657,13 @@ var run = (function (globalObject) {
     return this.call("allAttributes", {
       name: name,
       options: options || {}
+    });
+  };
+
+  SafariLocator.prototype.allRecords = function (options) {
+    options = options || {};
+    return this.call("allRecords", {
+      fields: options.fields || {}
     });
   };
 
@@ -601,12 +726,12 @@ var run = (function (globalObject) {
     });
   };
 
-  function SafariPlaywright(tabId) {
-    this.tabId = tabId;
+  function SafariPlaywright(tabIdentity) {
+    this.tabIdentity = tabIdentity;
   }
 
   SafariPlaywright.prototype.locator = function (selector) {
-    return new SafariLocator(this.tabId, [
+    return new SafariLocator(this.tabIdentity, [
       locatorStep("css", { selector: selector })
     ]);
   };
@@ -615,7 +740,7 @@ var run = (function (globalObject) {
     role,
     options
   ) {
-    return new SafariLocator(this.tabId, [])
+    return new SafariLocator(this.tabIdentity, [])
       .getByRole(role, options);
   };
 
@@ -623,7 +748,7 @@ var run = (function (globalObject) {
     text,
     options
   ) {
-    return new SafariLocator(this.tabId, [])
+    return new SafariLocator(this.tabIdentity, [])
       .getByText(text, options);
   };
 
@@ -631,7 +756,7 @@ var run = (function (globalObject) {
     text,
     options
   ) {
-    return new SafariLocator(this.tabId, [])
+    return new SafariLocator(this.tabIdentity, [])
       .getByLabel(text, options);
   };
 
@@ -639,18 +764,18 @@ var run = (function (globalObject) {
     text,
     options
   ) {
-    return new SafariLocator(this.tabId, [])
+    return new SafariLocator(this.tabIdentity, [])
       .getByPlaceholder(text, options);
   };
 
   SafariPlaywright.prototype.getByTestId = function (testId) {
-    return new SafariLocator(this.tabId, [])
+    return new SafariLocator(this.tabIdentity, [])
       .getByTestId(testId);
   };
 
   SafariPlaywright.prototype.domSnapshot = function () {
     return callSafari("playwright.domSnapshot", {
-      tabId: this.tabId
+      tabIdentity: this.tabIdentity
     });
   };
 
@@ -659,63 +784,94 @@ var run = (function (globalObject) {
     deltaY
   ) {
     return callSafari("playwright.scrollBy", {
-      tabId: this.tabId,
+      tabIdentity: this.tabIdentity,
       deltaX: deltaX,
       deltaY: deltaY
     });
   };
 
+  SafariPlaywright.prototype.waitForURL = function (
+    expected,
+    options
+  ) {
+    return callSafari("playwright.waitForURL", {
+      tabIdentity: this.tabIdentity,
+      expected: expected,
+      options: options || {}
+    });
+  };
+
+  SafariPlaywright.prototype.waitForLoadState = function (options) {
+    return callSafari("playwright.waitForLoadState", {
+      tabIdentity: this.tabIdentity,
+      options: options || {}
+    });
+  };
+
   SafariPlaywright.prototype.waitForTimeout = function (timeoutMs) {
-    foundation.NSThread.sleepForTimeInterval(
-      Math.max(0, Number(timeoutMs)) / 1000
+    var metadata = resolveTabIdentity(
+      this.tabIdentity,
+      listTabs()
     );
+    controlLifecycle.activate(metadata.id);
+
+    foundation.NSThread.sleepForTimeInterval(
+      Math.min(30000, Math.max(0, Number(timeoutMs) || 0)) /
+        1000
+    );
+    metadata = resolveTabIdentity(
+      this.tabIdentity,
+      listTabs()
+    );
+    controlLifecycle.activate(metadata.id);
   };
 
   function SafariTab(metadata) {
-    this.id = String(metadata.id);
-    this.playwright = new SafariPlaywright(this.id);
+    this._identity = createTabIdentity(metadata);
+    this.playwright = new SafariPlaywright(this._identity);
+    Object.defineProperty(this, "id", {
+      enumerable: true,
+      get: function () {
+        return this._identity.id;
+      }
+    });
   }
 
   SafariTab.prototype.title = function () {
-    controlLifecycle.activate(this.id);
-    var tabs = listTabs();
-
-    for (var index = 0; index < tabs.length; index++) {
-      if (tabs[index].id === this.id) {
-        return tabs[index].title;
-      }
-    }
-
-    return undefined;
+    var metadata = resolveTabIdentity(
+      this._identity,
+      listTabs()
+    );
+    controlLifecycle.activate(metadata.id);
+    return metadata.title;
   };
 
   SafariTab.prototype.url = function () {
-    controlLifecycle.activate(this.id);
-    var tabs = listTabs();
-
-    for (var index = 0; index < tabs.length; index++) {
-      if (tabs[index].id === this.id) {
-        return tabs[index].url;
-      }
-    }
-
-    return undefined;
+    var metadata = resolveTabIdentity(
+      this._identity,
+      listTabs()
+    );
+    controlLifecycle.activate(metadata.id);
+    return metadata.url;
   };
 
   SafariTab.prototype.goto = function (url) {
     return callSafari("page.navigate", {
-      tabId: this.id,
+      tabIdentity: this._identity,
       url: url
     });
   };
 
   SafariTab.prototype.close = function () {
-    return callSafari("tabs.close", { tabId: this.id });
+    return callSafari("tabs.close", {
+      tabIdentity: this._identity
+    });
   };
 
   function wrapTab(metadata) {
-    controlLifecycle.activate(metadata.id);
-    return new SafariTab(metadata);
+    var tab = new SafariTab(metadata);
+    controlLifecycle.activate(tab.id);
+    return tab;
   }
 
   var browser = Object.freeze({
@@ -896,7 +1052,7 @@ var run = (function (globalObject) {
         },
         serverInfo: {
           name: "safari-browser-use",
-          version: "0.1.0"
+          version: "0.1.1"
         }
       });
       return;

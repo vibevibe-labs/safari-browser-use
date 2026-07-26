@@ -4,7 +4,7 @@
 
 **Control your existing Safari 26 tabs with AI agents — no browser extension or companion app required.**
 
-[![Version](https://img.shields.io/badge/Version-0.1.0-6C63FF?style=for-the-badge)](https://github.com/vibevibe-labs/safari-browser-use)
+[![Version](https://img.shields.io/badge/Version-0.1.1-6C63FF?style=for-the-badge)](https://github.com/vibevibe-labs/safari-browser-use)
 [![macOS](https://img.shields.io/badge/macOS-Required-000000?style=for-the-badge&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Safari](https://img.shields.io/badge/Safari-26-006CFF?style=for-the-badge&logo=safari&logoColor=white)](https://www.apple.com/safari/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00C4CC?style=for-the-badge)](LICENSE)

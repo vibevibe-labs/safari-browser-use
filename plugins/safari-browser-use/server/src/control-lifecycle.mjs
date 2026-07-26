@@ -1,9 +1,14 @@
-export function createControlLifecycle({ show, hide }) {
+export function createControlLifecycle({ show, refresh, hide }) {
   let activeTabId = null;
 
   return {
     activate(tabId) {
       const nextTabId = String(tabId);
+
+      if (activeTabId === nextTabId) {
+        refresh(nextTabId);
+        return;
+      }
 
       if (activeTabId !== null && activeTabId !== nextTabId) {
         hide(activeTabId);

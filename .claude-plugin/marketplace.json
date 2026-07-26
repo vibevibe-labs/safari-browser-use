@@ -9,7 +9,7 @@
       "name": "safari-browser-use",
       "source": "./plugins/safari-browser-use",
       "description": "Control the user's existing Safari 26 session with agent-written JavaScript.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

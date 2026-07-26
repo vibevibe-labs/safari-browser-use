@@ -25,7 +25,7 @@ test("all client manifests expose the shared skill and native MCP config", async
     const manifest = await readJson(path);
 
     assert.equal(manifest.name, "safari-browser-use");
-    assert.equal(manifest.version, "0.1.0");
+    assert.equal(manifest.version, "0.1.1");
     assert.equal(manifest.skills, "./skills/");
     assert.equal(manifest.mcpServers, mcpServers);
   }
@@ -99,7 +99,7 @@ test("GitHub Copilot and Cursor marketplaces publish the shared plugin directory
   })), [{
     name: "safari-browser-use",
     source: "./plugins/safari-browser-use",
-    version: "0.1.0"
+    version: "0.1.1"
   }]);
 
   const cursor = await readRepositoryJson(
@@ -231,6 +231,31 @@ test("runtime API documents how to release the active tab", async () => {
   assert.match(runtimeApi, /control indicator/i);
 });
 
+test("navigation docs prefer state waits and stable tab recovery", async () => {
+  const [skill, runtimeApi] = await Promise.all([
+    readFile(
+      new URL("skills/control-safari/SKILL.md", pluginRoot),
+      "utf8"
+    ),
+    readFile(
+      new URL(
+        "skills/control-safari/references/runtime-api.md",
+        pluginRoot
+      ),
+      "utf8"
+    )
+  ]);
+
+  for (const document of [skill, runtimeApi]) {
+    assert.match(document, /waitForURL/);
+    assert.match(document, /waitForLoadState/);
+    assert.match(document, /stale_tab_handle/);
+  }
+
+  assert.match(skill, /href.*localized text/is);
+  assert.match(runtimeApi, /automatically reacquire/i);
+});
+
 test("skill documents bounded virtualized-list collection", async () => {
   const [skill, runtimeApi] = await Promise.all([
     readFile(
@@ -249,11 +274,13 @@ test("skill documents bounded virtualized-list collection", async () => {
   assert.match(skill, /virtualized/i);
   assert.match(skill, /scrollIntoView/);
   assert.match(skill, /scrollBy/);
+  assert.match(skill, /allRecords/);
   assert.match(skill, /three consecutive/i);
   assert.doesNotMatch(skill, /press\(["'](?:End|PageDown|Space|Tab)/);
   assert.match(runtimeApi, /scrollIntoView/);
   assert.match(runtimeApi, /scrollBy/);
   assert.match(runtimeApi, /allAttributes/);
+  assert.match(runtimeApi, /allRecords/);
   assert.match(runtimeApi, /synthetic/i);
 });
 
