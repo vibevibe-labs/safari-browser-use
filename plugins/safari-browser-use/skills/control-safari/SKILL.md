@@ -72,8 +72,9 @@ ambiguous locator.
 
 ## Control Indicator
 
-Selecting or operating a tab adds a non-interactive perimeter glow to show that
-the AI agent controls that page. Each browser operation refreshes the indicator.
+Selecting or operating a tab adds a non-interactive perimeter glow and flashes
+a yellow AI marker in its title. The title marker remains visible while the user
+works in another tab. Each browser operation refreshes both indicators.
 
 Always remove it before the final response, including when the task finishes
 early:
@@ -83,7 +84,8 @@ browser.release()
 ```
 
 `js_reset` and MCP shutdown also release control. A 45-second inactivity lease
-removes a stale indicator if the session ends unexpectedly.
+removes stale indicators and restores the page title if the session ends
+unexpectedly.
 
 ## Safety
 

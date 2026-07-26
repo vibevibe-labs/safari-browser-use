@@ -24,10 +24,36 @@ function runPageOperation(
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
+  const controlTitleTimerKey =
+    "__safari_browser_use_control_title_timer__";
+  const controlTitleBaseKey =
+    "__safari_browser_use_control_title_base__";
+  const controlTitlePattern = /^(?:🟡|⚫) AI · /u;
+
+  function updateControlTitle(lit) {
+    if (!controlTitlePattern.test(document.title)) {
+      window[controlTitleBaseKey] = document.title;
+    }
+
+    document.title = `${lit ? "🟡" : "⚫"} AI · ` +
+      window[controlTitleBaseKey];
+  }
 
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
     delete window[controlTimerKey];
+    window.clearInterval(window[controlTitleTimerKey]);
+    delete window[controlTitleTimerKey];
+
+    if (controlTitleBaseKey in window) {
+      if (!controlTitlePattern.test(document.title)) {
+        window[controlTitleBaseKey] = document.title;
+      }
+
+      document.title = window[controlTitleBaseKey];
+      delete window[controlTitleBaseKey];
+    }
+
     document.querySelector(
       `[${controlIndicatorAttribute}]`
     )?.remove();
@@ -85,6 +111,17 @@ function runPageOperation(
       willChange: "opacity"
     });
     document.documentElement.append(indicator);
+
+    window[controlTitleBaseKey] = document.title;
+    updateControlTitle(true);
+
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      let lit = true;
+      window[controlTitleTimerKey] = window.setInterval(() => {
+        lit = !lit;
+        updateControlTitle(lit);
+      }, 900);
+    }
 
     const requestedLeaseMs = Number(options.leaseMs);
     const leaseMs = Number.isFinite(requestedLeaseMs) &&
