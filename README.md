@@ -1,21 +1,8 @@
 <div align="center">
-  <img src="plugins/safari-browser-use/assets/vibevibe-labs-icon.jpg" alt="VibeVibe Labs" width="112" height="112">
-  <h1>Safari Browser Use</h1>
-  <p><strong>Let AI agents control the Safari session you already use.</strong></p>
-  <p>
-    <a href="#installation">Installation</a>
-    ·
-    <a href="#quick-start">Quick Start</a>
-    ·
-    <a href="plugins/safari-browser-use/README.md#supported-agents">Supported Agents</a>
-  </p>
-  <p>
-    <code>Codex</code>
-    <code>Claude Code</code>
-    <code>GitHub Copilot CLI</code>
-    <code>Cursor Agent</code>
-  </p>
+  <img src="plugins/safari-browser-use/assets/safari-browser-use-hero.png" alt="Safari Browser Use by VibeVibe Labs" width="100%">
 </div>
+
+# Safari Browser Use
 
 Safari Browser Use lets Codex, Claude Code, GitHub Copilot, and Cursor control
 your existing Safari 26 tabs with agent-written JavaScript.
@@ -39,17 +26,19 @@ Safari 27 is not supported by this release.
 
 ## Installation
 
-### Ask an agent
+### Setup prompt
 
-Send this single instruction to Codex, Claude Code, GitHub Copilot, or Cursor:
+Paste into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 
-> Install and register Safari Browser Use from https://github.com/vibevibe-labs/safari-browser-use for the current client, guide me through enabling JavaScript from Apple Events in Safari, restart the client if needed, and verify the setup with `browser.doctor()`.
+```text
+Install or upgrade Safari Browser Use for this client from https://github.com/vibevibe-labs/safari-browser-use using its native plugin system; do not install Node.js or build from source. Reload plugins when supported, or tell me to start a new session, then connect it to Safari 26. Ask me to enable "Allow JavaScript from Apple Events" if needed. Follow https://github.com/vibevibe-labs/safari-browser-use/blob/main/plugins/safari-browser-use/README.md#manual-installation if setup or connection fails.
+```
 
-### Install manually
+### Manual installation
 
 Follow the
-[installation and quick-start guide](plugins/safari-browser-use/README.md)
-for your client and the two required macOS permissions.
+[client-specific installation guide](plugins/safari-browser-use/README.md#manual-installation)
+for Codex, Claude Code, GitHub Copilot CLI, or Cursor.
 
 ## Quick Start
 
