@@ -6,6 +6,8 @@ ObjC.import("Foundation");
 
 /*__SBU_TOOL_DEFINITIONS__*/
 
+/*__SBU_CONTROL_LIFECYCLE__*/
+
 var run = (function (globalObject) {
   var foundation = $;
   var safari = Application("Safari");
@@ -235,6 +237,26 @@ var run = (function (globalObject) {
     return envelope.value;
   }
 
+  var controlLifecycle = createControlLifecycle({
+    show: function (tabId) {
+      try {
+        runPage("control.show", {
+          tabId: tabId,
+          leaseMs: 45000
+        });
+      } catch (error) {
+        // The indicator must never block the browser operation.
+      }
+    },
+    hide: function (tabId) {
+      try {
+        runPage("control.hide", { tabId: tabId });
+      } catch (error) {
+        // Navigation or tab closure may already have removed it.
+      }
+    }
+  });
+
   function waitFor(params) {
     var options = params.options || {};
     var state = options.state || "visible";
@@ -262,6 +284,10 @@ var run = (function (globalObject) {
   function callSafari(method, params) {
     ensureSafari26();
     params = params || {};
+
+    if (params.tabId && method !== "tabs.close") {
+      controlLifecycle.activate(params.tabId);
+    }
 
     if (method === "tabs.list") {
       return listTabs();
@@ -627,6 +653,7 @@ var run = (function (globalObject) {
   }
 
   SafariTab.prototype.title = function () {
+    controlLifecycle.activate(this.id);
     var tabs = listTabs();
 
     for (var index = 0; index < tabs.length; index++) {
@@ -639,6 +666,7 @@ var run = (function (globalObject) {
   };
 
   SafariTab.prototype.url = function () {
+    controlLifecycle.activate(this.id);
     var tabs = listTabs();
 
     for (var index = 0; index < tabs.length; index++) {
@@ -662,12 +690,17 @@ var run = (function (globalObject) {
   };
 
   function wrapTab(metadata) {
+    controlLifecycle.activate(metadata.id);
     return new SafariTab(metadata);
   }
 
   var browser = Object.freeze({
     name: "Safari 26",
     doctor: doctor,
+    release: function () {
+      controlLifecycle.release();
+      return { released: true };
+    },
     tabs: Object.freeze({
       list: function () {
         return callSafari("tabs.list", {});
@@ -806,6 +839,7 @@ var run = (function (globalObject) {
       }
 
       if (name === "js_reset") {
+        controlLifecycle.release();
         resetRepl();
         success(message.id, toolResult({
           value: undefined,
@@ -921,6 +955,10 @@ var run = (function (globalObject) {
   }
 
   return function () {
-    serve();
+    try {
+      serve();
+    } finally {
+      controlLifecycle.release();
+    }
   };
 })(this);

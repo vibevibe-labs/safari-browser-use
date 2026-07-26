@@ -11,18 +11,12 @@ It provides:
 
 - A persistent synchronous JavaScript REPL
 - A Playwright-style API for inspecting and interacting with pages
+- A visible perimeter glow on the tab currently controlled by the agent
 - Native plugin manifests for Codex, Claude Code, GitHub Copilot, and Cursor
 - Browser automation through the Apple Events support built into macOS
 
 It does not require Node.js, npm, a companion app, Xcode, or an Apple
 Developer certificate.
-
-## Requirements
-
-- macOS with Safari 26
-- JavaScript from Apple Events enabled in Safari
-
-Safari 27 is not supported by this release.
 
 ## Installation
 
@@ -81,36 +75,19 @@ Start with a natural-language request:
 
 > Use Safari Browser Use to inspect my current Safari tab and summarize the page. Do not click or type anything.
 
-Or call the `js` MCP tool directly:
-
-```json
-{
-  "title": "Check Safari",
-  "code": "browser.doctor()"
-}
-```
-
-```json
-{
-  "title": "Inspect the current tab",
-  "code": "var tab = browser.tabs.selected(); tab.playwright.domSnapshot()"
-}
-```
-
-```json
-{
-  "title": "Click Continue",
-  "code": "var button = tab.playwright.getByRole('button', { name: 'Continue', exact: true }); if (button.count() !== 1) throw new Error('Expected one Continue button'); button.click()"
-}
-```
-
 Variables persist between `js` calls. Use `js_reset` when you want a clean
 REPL context.
+
+Selecting or operating a tab adds a non-interactive perimeter glow so you can
+see which page the agent controls. The agent removes the control indicator with
+`browser.release()` when the browser task ends. It also clears automatically
+after 45 seconds without tab activity.
 
 ## Available Browser API
 
 ```js
 browser.doctor()
+browser.release()
 browser.tabs.list()
 var tab = browser.tabs.selected()
 tab.title()

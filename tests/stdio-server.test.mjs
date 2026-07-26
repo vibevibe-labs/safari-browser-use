@@ -40,7 +40,7 @@ test("starts the real MCP entrypoint over stdio", async t => {
     name: "js",
     arguments: {
       title: "Reuse the persistent value",
-      code: "({ answer, browserType: typeof browser })"
+      code: "({ answer, browserType: typeof browser, releaseType: typeof browser.release })"
     }
   });
 
@@ -51,7 +51,8 @@ test("starts the real MCP entrypoint over stdio", async t => {
   assert.equal(first.structuredContent.value, 42);
   assert.deepEqual(second.structuredContent.value, {
     answer: 42,
-    browserType: "object"
+    browserType: "object",
+    releaseType: "function"
   });
 });
 

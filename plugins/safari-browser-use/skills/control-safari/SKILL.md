@@ -41,6 +41,7 @@ bindings are local to one cell.
 5. Click, fill, press, check, or select only when the locator resolves to one
    element.
 6. Verify the result with a targeted read or a fresh snapshot.
+7. Call `browser.release()` after the browser task finishes or stops.
 
 Example:
 
@@ -64,6 +65,21 @@ tab.playwright.domSnapshot()
 
 Do not guess selectors or use `.first()`, `.last()`, or `.nth()` to bypass an
 ambiguous locator.
+
+## Control Indicator
+
+Selecting or operating a tab adds a non-interactive perimeter glow to show that
+the AI agent controls that page. Each browser operation refreshes the indicator.
+
+Always remove it before the final response, including when the task finishes
+early:
+
+```js
+browser.release()
+```
+
+`js_reset` and MCP shutdown also release control. A 45-second inactivity lease
+removes a stale indicator if the session ends unexpectedly.
 
 ## Safety
 

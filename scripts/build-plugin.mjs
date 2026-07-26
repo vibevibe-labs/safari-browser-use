@@ -22,6 +22,10 @@ const toolDefinitionsPath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/tool-definitions.mjs"
 );
+const controlLifecyclePath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/control-lifecycle.mjs"
+);
 const defaultOutfile = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/dist/server.jxa.js"
@@ -32,12 +36,14 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     template,
     pageRuntime,
     safariVersion,
-    toolDefinitions
+    toolDefinitions,
+    controlLifecycle
   ] = await Promise.all([
     readFile(templatePath, "utf8"),
     readFile(pageRuntimePath, "utf8"),
     readFile(safariVersionPath, "utf8"),
-    readFile(toolDefinitionsPath, "utf8")
+    readFile(toolDefinitionsPath, "utf8"),
+    readFile(controlLifecyclePath, "utf8")
   ]);
   const withoutExports = source =>
     source.replace(/^export\s+/gm, "");
@@ -53,6 +59,10 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     .replace(
       "/*__SBU_TOOL_DEFINITIONS__*/",
       withoutExports(toolDefinitions)
+    )
+    .replace(
+      "/*__SBU_CONTROL_LIFECYCLE__*/",
+      withoutExports(controlLifecycle)
     );
 
   await writeFile(outfile, output);
