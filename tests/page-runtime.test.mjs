@@ -181,3 +181,59 @@ test("reports locator state synchronously for JXA-side polling", () => {
     true
   );
 });
+
+test("shows one non-interactive AI control indicator", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+
+  execute("control.show", { leaseMs: 1000 });
+  execute("control.show", { leaseMs: 1000 });
+
+  const indicators = window.document.querySelectorAll(
+    "[data-safari-browser-use-control]"
+  );
+  const indicator = indicators[0];
+  const style = window.document.getElementById(
+    "__safari_browser_use_control_style__"
+  );
+
+  assert.equal(indicators.length, 1);
+  assert.equal(indicator.style.pointerEvents, "none");
+  assert.equal(indicator.getAttribute("aria-hidden"), "true");
+  assert.match(style.textContent, /prefers-reduced-motion/);
+
+  execute("control.hide");
+});
+
+test("hides the AI control indicator and its styles", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+
+  execute("control.show", { leaseMs: 1000 });
+  execute("control.hide");
+
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control]"
+    ),
+    null
+  );
+  assert.equal(
+    window.document.getElementById(
+      "__safari_browser_use_control_style__"
+    ),
+    null
+  );
+});
+
+test("expires the AI control indicator after inactivity", async () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+
+  execute("control.show", { leaseMs: 5 });
+  await new Promise(resolve => setTimeout(resolve, 20));
+
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control]"
+    ),
+    null
+  );
+});

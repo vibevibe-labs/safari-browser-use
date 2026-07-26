@@ -16,6 +16,83 @@ export function runPageOperation(
   ].join(",");
   const snapshotSelector =
     `${interactiveSelector},[data-testid]`;
+  const controlIndicatorAttribute =
+    "data-safari-browser-use-control";
+  const controlStyleId =
+    "__safari_browser_use_control_style__";
+  const controlTimerKey =
+    "__safari_browser_use_control_timer__";
+
+  function hideControlIndicator() {
+    window.clearTimeout(window[controlTimerKey]);
+    delete window[controlTimerKey];
+    document.querySelector(
+      `[${controlIndicatorAttribute}]`
+    )?.remove();
+    document.getElementById(controlStyleId)?.remove();
+
+    return { visible: false };
+  }
+
+  function showControlIndicator(options) {
+    hideControlIndicator();
+
+    const style = document.createElement("style");
+    style.id = controlStyleId;
+    style.textContent = `
+      @keyframes __safari_browser_use_control_breathe__ {
+        0%, 100% { opacity: 0.72; }
+        50% { opacity: 1; }
+      }
+
+      [${controlIndicatorAttribute}] {
+        animation:
+          __safari_browser_use_control_breathe__
+          1800ms cubic-bezier(0.25, 1, 0.5, 1) infinite;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${controlIndicatorAttribute}] {
+          animation: none !important;
+          opacity: 0.9 !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).append(style);
+
+    const indicator = document.createElement("div");
+    indicator.setAttribute(controlIndicatorAttribute, "");
+    indicator.setAttribute("aria-hidden", "true");
+    Object.assign(indicator.style, {
+      position: "fixed",
+      inset: "0",
+      boxSizing: "border-box",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+      border: "2px solid rgba(188, 191, 86, 0.82)",
+      borderRadius: "10px",
+      boxShadow: [
+        "inset 0 0 14px rgba(255, 255, 245, 0.74)",
+        "inset 0 0 46px rgba(213, 216, 105, 0.58)",
+        "inset 0 0 110px rgba(169, 176, 70, 0.34)"
+      ].join(", "),
+      contain: "strict",
+      willChange: "opacity"
+    });
+    document.documentElement.append(indicator);
+
+    const requestedLeaseMs = Number(options.leaseMs);
+    const leaseMs = Number.isFinite(requestedLeaseMs) &&
+      requestedLeaseMs > 0
+      ? Math.min(requestedLeaseMs, 300_000)
+      : 45_000;
+    window[controlTimerKey] = window.setTimeout(
+      hideControlIndicator,
+      leaseMs
+    );
+
+    return { visible: true };
+  }
 
   function normalizeText(value) {
     return value?.replace(/\s+/g, " ").trim() ?? "";
@@ -287,6 +364,14 @@ export function runPageOperation(
 
   if (method === "playwright.domSnapshot") {
     return domSnapshot();
+  }
+
+  if (method === "control.show") {
+    return showControlIndicator(params);
+  }
+
+  if (method === "control.hide") {
+    return hideControlIndicator();
   }
 
   if (!method.startsWith("playwright.locator.")) {

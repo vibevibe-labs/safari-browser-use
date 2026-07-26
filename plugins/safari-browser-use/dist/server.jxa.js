@@ -18,6 +18,83 @@ function runPageOperation(
   ].join(",");
   const snapshotSelector =
     `${interactiveSelector},[data-testid]`;
+  const controlIndicatorAttribute =
+    "data-safari-browser-use-control";
+  const controlStyleId =
+    "__safari_browser_use_control_style__";
+  const controlTimerKey =
+    "__safari_browser_use_control_timer__";
+
+  function hideControlIndicator() {
+    window.clearTimeout(window[controlTimerKey]);
+    delete window[controlTimerKey];
+    document.querySelector(
+      `[${controlIndicatorAttribute}]`
+    )?.remove();
+    document.getElementById(controlStyleId)?.remove();
+
+    return { visible: false };
+  }
+
+  function showControlIndicator(options) {
+    hideControlIndicator();
+
+    const style = document.createElement("style");
+    style.id = controlStyleId;
+    style.textContent = `
+      @keyframes __safari_browser_use_control_breathe__ {
+        0%, 100% { opacity: 0.72; }
+        50% { opacity: 1; }
+      }
+
+      [${controlIndicatorAttribute}] {
+        animation:
+          __safari_browser_use_control_breathe__
+          1800ms cubic-bezier(0.25, 1, 0.5, 1) infinite;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${controlIndicatorAttribute}] {
+          animation: none !important;
+          opacity: 0.9 !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).append(style);
+
+    const indicator = document.createElement("div");
+    indicator.setAttribute(controlIndicatorAttribute, "");
+    indicator.setAttribute("aria-hidden", "true");
+    Object.assign(indicator.style, {
+      position: "fixed",
+      inset: "0",
+      boxSizing: "border-box",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+      border: "2px solid rgba(188, 191, 86, 0.82)",
+      borderRadius: "10px",
+      boxShadow: [
+        "inset 0 0 14px rgba(255, 255, 245, 0.74)",
+        "inset 0 0 46px rgba(213, 216, 105, 0.58)",
+        "inset 0 0 110px rgba(169, 176, 70, 0.34)"
+      ].join(", "),
+      contain: "strict",
+      willChange: "opacity"
+    });
+    document.documentElement.append(indicator);
+
+    const requestedLeaseMs = Number(options.leaseMs);
+    const leaseMs = Number.isFinite(requestedLeaseMs) &&
+      requestedLeaseMs > 0
+      ? Math.min(requestedLeaseMs, 300_000)
+      : 45_000;
+    window[controlTimerKey] = window.setTimeout(
+      hideControlIndicator,
+      leaseMs
+    );
+
+    return { visible: true };
+  }
 
   function normalizeText(value) {
     return value?.replace(/\s+/g, " ").trim() ?? "";
@@ -291,6 +368,14 @@ function runPageOperation(
     return domSnapshot();
   }
 
+  if (method === "control.show") {
+    return showControlIndicator(params);
+  }
+
+  if (method === "control.hide") {
+    return hideControlIndicator();
+  }
+
   if (!method.startsWith("playwright.locator.")) {
     throw new Error(`unsupported_playwright_method: ${method}`);
   }
@@ -466,6 +551,34 @@ function createToolDefinitions() {
       }
     }
   ];
+}
+
+
+function createControlLifecycle({ show, hide }) {
+  let activeTabId = null;
+
+  return {
+    activate(tabId) {
+      const nextTabId = String(tabId);
+
+      if (activeTabId !== null && activeTabId !== nextTabId) {
+        hide(activeTabId);
+      }
+
+      activeTabId = nextTabId;
+      show(nextTabId);
+    },
+
+    release() {
+      if (activeTabId === null) {
+        return;
+      }
+
+      const releasedTabId = activeTabId;
+      activeTabId = null;
+      hide(releasedTabId);
+    }
+  };
 }
 
 
@@ -698,6 +811,26 @@ var run = (function (globalObject) {
     return envelope.value;
   }
 
+  var controlLifecycle = createControlLifecycle({
+    show: function (tabId) {
+      try {
+        runPage("control.show", {
+          tabId: tabId,
+          leaseMs: 45000
+        });
+      } catch (error) {
+        // The indicator must never block the browser operation.
+      }
+    },
+    hide: function (tabId) {
+      try {
+        runPage("control.hide", { tabId: tabId });
+      } catch (error) {
+        // Navigation or tab closure may already have removed it.
+      }
+    }
+  });
+
   function waitFor(params) {
     var options = params.options || {};
     var state = options.state || "visible";
@@ -725,6 +858,10 @@ var run = (function (globalObject) {
   function callSafari(method, params) {
     ensureSafari26();
     params = params || {};
+
+    if (params.tabId && method !== "tabs.close") {
+      controlLifecycle.activate(params.tabId);
+    }
 
     if (method === "tabs.list") {
       return listTabs();
@@ -1090,6 +1227,7 @@ var run = (function (globalObject) {
   }
 
   SafariTab.prototype.title = function () {
+    controlLifecycle.activate(this.id);
     var tabs = listTabs();
 
     for (var index = 0; index < tabs.length; index++) {
@@ -1102,6 +1240,7 @@ var run = (function (globalObject) {
   };
 
   SafariTab.prototype.url = function () {
+    controlLifecycle.activate(this.id);
     var tabs = listTabs();
 
     for (var index = 0; index < tabs.length; index++) {
@@ -1125,12 +1264,17 @@ var run = (function (globalObject) {
   };
 
   function wrapTab(metadata) {
+    controlLifecycle.activate(metadata.id);
     return new SafariTab(metadata);
   }
 
   var browser = Object.freeze({
     name: "Safari 26",
     doctor: doctor,
+    release: function () {
+      controlLifecycle.release();
+      return { released: true };
+    },
     tabs: Object.freeze({
       list: function () {
         return callSafari("tabs.list", {});
@@ -1269,6 +1413,7 @@ var run = (function (globalObject) {
       }
 
       if (name === "js_reset") {
+        controlLifecycle.release();
         resetRepl();
         success(message.id, toolResult({
           value: undefined,
@@ -1384,6 +1529,10 @@ var run = (function (globalObject) {
   }
 
   return function () {
-    serve();
+    try {
+      serve();
+    } finally {
+      controlLifecycle.release();
+    }
   };
 })(this);

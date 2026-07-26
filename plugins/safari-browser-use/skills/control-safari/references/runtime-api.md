@@ -14,6 +14,7 @@ Cells are synchronous. The value of the final expression is returned.
 | Method | Purpose |
 |---|---|
 | `browser.doctor()` | Check Safari 26, Automation access, and JavaScript from Apple Events |
+| `browser.release()` | Remove the active tab's AI control indicator |
 | `browser.tabs.list()` | List open Safari tabs |
 | `browser.tabs.selected()` | Return the selected `Tab` |
 | `browser.tabs.get(id)` | Return a tab by ID |
@@ -34,6 +35,13 @@ Cells are synchronous. The value of the final expression is returned.
 Safari tab coordinates can change when tabs are moved or closed. Reacquire the
 tab with `browser.tabs.selected()` or `browser.tabs.get(id)` after manual tab
 reordering.
+
+## Control Indicator
+
+Selecting a tab or calling one of its browser methods displays a non-interactive
+perimeter glow. Call `browser.release()` when the browser task finishes. The
+indicator is also removed by `js_reset`, MCP shutdown, or 45 seconds without
+activity on that tab.
 
 ## Locator Builders
 

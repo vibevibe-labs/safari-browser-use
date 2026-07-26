@@ -19,6 +19,12 @@ Check, in order:
 
 Do not attempt to change these settings without the user's knowledge.
 
+## Control Indicator Remains Visible
+
+Call `browser.release()` to remove the active tab's perimeter glow. `js_reset`
+also releases it. If the MCP process ended unexpectedly, the indicator removes
+itself after 45 seconds without browser activity.
+
 ## REPL Binding Conflicts
 
 Reuse or reassign an existing `var`, choose a fresh name, or call `js_reset`

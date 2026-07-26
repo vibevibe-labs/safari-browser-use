@@ -170,8 +170,23 @@ test("skill uses Apple Events without an extension bridge", async () => {
 
   assert.match(skill, /Apple Events/);
   assert.match(skill, /synchronous/i);
+  assert.match(skill, /browser\.release\(\)/);
+  assert.match(skill, /control indicator/i);
   assert.doesNotMatch(skill, /\bawait\b/);
   assert.doesNotMatch(skill, /bridge|Safari extension/i);
+});
+
+test("runtime API documents how to release the active tab", async () => {
+  const runtimeApi = await readFile(
+    new URL(
+      "skills/control-safari/references/runtime-api.md",
+      pluginRoot
+    ),
+    "utf8"
+  );
+
+  assert.match(runtimeApi, /browser\.release\(\)/);
+  assert.match(runtimeApi, /control indicator/i);
 });
 
 test("repository quick start describes a zero-dependency synchronous REPL", async () => {
