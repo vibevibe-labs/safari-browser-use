@@ -246,10 +246,14 @@ test("flashes a yellow light in the controlled tab title", () => {
   execute("control.hide");
 });
 
-test("flashes a yellow favicon for compact Safari tabs", () => {
+test("adds a yellow breathing halo around the original favicon", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
+  const original = window.document.createElement("link");
   let blink;
 
+  original.setAttribute("rel", "icon");
+  original.setAttribute("href", "/favicon.svg?theme=dark&v=1");
+  window.document.head.append(original);
   window.setInterval = callback => {
     blink = callback;
     return 7;
@@ -261,21 +265,30 @@ test("flashes a yellow favicon for compact Safari tabs", () => {
     "[data-safari-browser-use-control-favicon]"
   );
   const litIcon = favicon.getAttribute("href");
+  const litSvg = decodeURIComponent(litIcon.split(",")[1]);
 
   assert.equal(favicon.getAttribute("rel"), "icon");
   assert.match(litIcon, /^data:image\/svg\+xml,/);
+  assert.match(litSvg, /<image /);
+  assert.match(
+    litSvg,
+    /href="https:\/\/example\.com\/favicon\.svg\?theme=dark&amp;v=1"/
+  );
+  assert.match(litSvg, /#ffd400/i);
 
   blink();
 
   const dimIcon = favicon.getAttribute("href");
+  const dimSvg = decodeURIComponent(dimIcon.split(",")[1]);
 
   assert.notEqual(dimIcon, litIcon);
-  assert.match(dimIcon, /^data:image\/svg\+xml,/);
+  assert.match(dimSvg, /<image /);
+  assert.match(dimSvg, /#ad9300/i);
 
   execute("control.hide");
 });
 
-test("restores the original favicon after control ends", () => {
+test("starts and stops the overlay and favicon indicator together", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
   const original = window.document.createElement("link");
   const following = window.document.createElement("meta");
@@ -287,10 +300,28 @@ test("restores the original favicon after control ends", () => {
 
   execute("control.show", { leaseMs: 1000 });
 
+  assert.notEqual(
+    window.document.querySelector(
+      "[data-safari-browser-use-control]"
+    ),
+    null
+  );
+  assert.notEqual(
+    window.document.querySelector(
+      "[data-safari-browser-use-control-favicon]"
+    ),
+    null
+  );
   assert.equal(original.isConnected, false);
 
   execute("control.hide");
 
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control]"
+    ),
+    null
+  );
   assert.equal(
     window.document.querySelector(
       "[data-safari-browser-use-control-favicon]"

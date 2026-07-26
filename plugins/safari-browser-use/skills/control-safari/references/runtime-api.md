@@ -39,11 +39,12 @@ reordering.
 ## Control Indicator
 
 Selecting a tab or calling one of its browser methods displays a non-interactive
-perimeter glow, flashes a yellow favicon that remains visible in compact Safari
-tabs, and prefixes the title with an AI marker. Call `browser.release()` when
-the browser task finishes. The indicators are removed and the original title
-and favicon are restored by `js_reset`, MCP shutdown, or 45 seconds without
-activity on that tab.
+perimeter glow, surrounds the original favicon with a yellow breathing halo
+that remains visible in compact Safari tabs, and prefixes the title with an AI
+marker. The page glow and favicon halo share one control lifecycle. Call
+`browser.release()` when the browser task finishes. The indicator is removed
+and the original title and favicon are restored by `js_reset`, MCP shutdown, or
+45 seconds without activity on that tab.
 
 ## Locator Builders
 

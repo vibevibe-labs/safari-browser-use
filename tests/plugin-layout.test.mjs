@@ -250,6 +250,8 @@ test("control indicator docs cover compact Safari tabs", async () => {
   for (const document of documents) {
     assert.match(document, /favicon/i);
     assert.match(document, /compact Safari\s+tabs/i);
+    assert.match(document, /original favicon/i);
+    assert.match(document, /yellow.*halo/is);
   }
 });
 
