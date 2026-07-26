@@ -20,45 +20,23 @@ function runPageOperation(
     `${interactiveSelector},[data-testid]`;
   const controlIndicatorAttribute =
     "data-safari-browser-use-control";
+  const controlCursorAttribute =
+    "data-safari-browser-use-control-cursor";
   const controlStyleId =
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
-  const controlTitleTimerKey =
-    "__safari_browser_use_control_title_timer__";
-  const controlTitleBaseKey =
-    "__safari_browser_use_control_title_base__";
   const controlFaviconAttribute =
     "data-safari-browser-use-control-favicon";
   const controlFaviconStateKey =
     "__safari_browser_use_control_favicon_state__";
-  const controlTitlePattern = /^(?:🟡|⚫) AI · /u;
 
-  function escapeXmlAttribute(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function controlFaviconUrl(lit, sourceUrl) {
-    const color = lit ? "#ffd400" : "#ad9300";
-    const opacity = lit ? "0.92" : "0.5";
-    const blur = lit ? "2.8" : "1.4";
+  function controlFaviconUrl() {
     const svg = [
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
-      '<defs><filter id="halo" x="-50%" y="-50%" ',
-      'width="200%" height="200%">',
-      `<feGaussianBlur stdDeviation="${blur}"/>`,
-      "</filter></defs>",
-      `<circle cx="16" cy="16" r="12" fill="none" stroke="${color}"`,
-      ` stroke-width="4" opacity="${opacity}" filter="url(#halo)"/>`,
-      `<circle cx="16" cy="16" r="12" fill="none" stroke="${color}"`,
-      ` stroke-width="2" opacity="${opacity}"/>`,
-      `<image href="${escapeXmlAttribute(sourceUrl)}" x="6" y="6"`,
-      ' width="20" height="20" preserveAspectRatio="xMidYMid meet"/>',
+      '<circle cx="16" cy="16" r="13" fill="#ffd400"',
+      ' stroke="#665500" stroke-width="2"/>',
+      '<circle cx="11" cy="10" r="4" fill="#fff3a0"/>',
       "</svg>"
     ].join("");
 
@@ -73,8 +51,6 @@ function runPageOperation(
       parent: link.parentNode,
       nextSibling: link.nextSibling
     }));
-    const sourceUrl = originals[0]?.link.href ||
-      new URL("/favicon.ico", document.baseURI).href;
 
     originals.forEach(({ link }) => link.remove());
 
@@ -82,24 +58,13 @@ function runPageOperation(
     favicon.setAttribute("rel", "icon");
     favicon.setAttribute("type", "image/svg+xml");
     favicon.setAttribute(controlFaviconAttribute, "");
+    favicon.setAttribute("href", controlFaviconUrl());
     (document.head || document.documentElement).append(favicon);
 
     window[controlFaviconStateKey] = {
       favicon,
-      originals,
-      sourceUrl
+      originals
     };
-  }
-
-  function updateControlFavicon(lit) {
-    const state = window[controlFaviconStateKey];
-
-    if (state?.favicon?.isConnected) {
-      state.favicon.setAttribute(
-        "href",
-        controlFaviconUrl(lit, state.sourceUrl)
-      );
-    }
   }
 
   function restoreControlFavicon() {
@@ -125,29 +90,9 @@ function runPageOperation(
     delete window[controlFaviconStateKey];
   }
 
-  function updateControlTitle(lit) {
-    if (!controlTitlePattern.test(document.title)) {
-      window[controlTitleBaseKey] = document.title;
-    }
-
-    document.title = `${lit ? "🟡" : "⚫"} AI · ` +
-      window[controlTitleBaseKey];
-  }
-
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
     delete window[controlTimerKey];
-    window.clearInterval(window[controlTitleTimerKey]);
-    delete window[controlTitleTimerKey];
-
-    if (controlTitleBaseKey in window) {
-      if (!controlTitlePattern.test(document.title)) {
-        window[controlTitleBaseKey] = document.title;
-      }
-
-      document.title = window[controlTitleBaseKey];
-      delete window[controlTitleBaseKey];
-    }
 
     document.querySelector(
       `[${controlIndicatorAttribute}]`
@@ -206,21 +151,32 @@ function runPageOperation(
       contain: "strict",
       willChange: "opacity"
     });
+
+    const cursor = document.createElement("div");
+    const cursorSvg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 36">',
+      '<path d="M3 2v27l7-7 6 12 6-3-6-11h10z"',
+      ' fill="#111" stroke="#fff" stroke-width="2"',
+      ' stroke-linejoin="round"/>',
+      "</svg>"
+    ].join("");
+    cursor.setAttribute(controlCursorAttribute, "");
+    Object.assign(cursor.style, {
+      position: "absolute",
+      right: "96px",
+      bottom: "80px",
+      width: "28px",
+      height: "36px",
+      pointerEvents: "none",
+      backgroundImage:
+        `url("data:image/svg+xml,${encodeURIComponent(cursorSvg)}")`,
+      backgroundRepeat: "no-repeat",
+      backgroundSize: "contain",
+      filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55))"
+    });
+    indicator.append(cursor);
     document.documentElement.append(indicator);
-
     showControlFavicon();
-    window[controlTitleBaseKey] = document.title;
-    updateControlTitle(true);
-    updateControlFavicon(true);
-
-    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      let lit = true;
-      window[controlTitleTimerKey] = window.setInterval(() => {
-        lit = !lit;
-        updateControlTitle(lit);
-        updateControlFavicon(lit);
-      }, 900);
-    }
 
     const requestedLeaseMs = Number(options.leaseMs);
     const leaseMs = Number.isFinite(requestedLeaseMs) &&

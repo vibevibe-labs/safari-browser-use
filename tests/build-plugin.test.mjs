@@ -34,6 +34,11 @@ test("builds a self-contained JXA MCP server", async t => {
     bundle,
     /SafariLocator\.prototype\.allAttributes/
   );
+  assert.match(
+    bundle,
+    /data-safari-browser-use-control-favicon/
+  );
+  assert.match(bundle, /controlFaviconUrl/);
   assert.doesNotMatch(bundle, /\bimport\s/);
   assert.doesNotMatch(bundle, /\brequire\s*\(/);
   assert.doesNotMatch(bundle, /node:/);
