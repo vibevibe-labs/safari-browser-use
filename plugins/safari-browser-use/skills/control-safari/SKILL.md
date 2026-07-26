@@ -121,10 +121,10 @@ behavior, so the runtime rejects them instead of reporting false success.
 
 ## Control Indicator
 
-Selecting or operating a tab adds a non-interactive perimeter glow, surrounds
-the original favicon with a yellow breathing halo that remains visible in
-compact Safari tabs, and prefixes its title with an AI marker. The page glow
-and favicon halo start, refresh, and stop together as one control indicator.
+Selecting or operating a tab adds a non-interactive perimeter glow and replaces
+the original favicon with a solid yellow light that remains visible in
+compact Safari tabs. The page glow and yellow favicon start, refresh, and stop together
+as one control indicator.
 
 Always remove it before the final response, including when the task finishes
 early:
@@ -134,8 +134,8 @@ browser.release()
 ```
 
 `js_reset` and MCP shutdown also release control. A 45-second inactivity lease
-removes stale indicators and restores the page title and favicon if the session
-ends unexpectedly.
+removes stale indicators and restores the original favicon if the session ends
+unexpectedly.
 
 ## Safety
 

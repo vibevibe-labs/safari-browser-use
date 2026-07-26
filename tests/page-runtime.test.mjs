@@ -340,37 +340,48 @@ test("makes active AI control visually unmistakable", () => {
   execute("control.hide");
 });
 
-test("flashes a yellow light in the controlled tab title", () => {
+test("shows a non-interactive fake cursor inside the overlay", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
-  let blink;
-
-  window.document.title = "Dashboard";
-  window.setInterval = callback => {
-    blink = callback;
-    return 7;
-  };
 
   execute("control.show", { leaseMs: 1000 });
 
-  assert.equal(window.document.title, "🟡 AI · Dashboard");
-  blink();
-  assert.equal(window.document.title, "⚫ AI · Dashboard");
-  blink();
-  assert.equal(window.document.title, "🟡 AI · Dashboard");
+  const indicator = window.document.querySelector(
+    "[data-safari-browser-use-control]"
+  );
+  const cursor = indicator.querySelector(
+    "[data-safari-browser-use-control-cursor]"
+  );
+
+  assert.notEqual(cursor, null);
+  assert.equal(cursor.style.pointerEvents, "none");
+
+  execute("control.hide");
+
+  assert.equal(cursor.isConnected, false);
+});
+
+test("leaves the controlled tab title unchanged", () => {
+  const { execute, window } = createPage("<main>Dashboard</main>");
+
+  window.document.title = "Dashboard";
+
+  execute("control.show", { leaseMs: 1000 });
+
+  assert.equal(window.document.title, "Dashboard");
 
   execute("control.hide");
 });
 
-test("adds a yellow breathing halo around the original favicon", () => {
+test("replaces the original favicon with a solid yellow light", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
   const original = window.document.createElement("link");
-  let blink;
+  let intervals = 0;
 
   original.setAttribute("rel", "icon");
   original.setAttribute("href", "/favicon.svg?theme=dark&v=1");
   window.document.head.append(original);
-  window.setInterval = callback => {
-    blink = callback;
+  window.setInterval = () => {
+    intervals++;
     return 7;
   };
 
@@ -379,36 +390,26 @@ test("adds a yellow breathing halo around the original favicon", () => {
   const favicon = window.document.querySelector(
     "[data-safari-browser-use-control-favicon]"
   );
-  const litIcon = favicon.getAttribute("href");
-  const litSvg = decodeURIComponent(litIcon.split(",")[1]);
+  const href = favicon.getAttribute("href");
+  const svg = decodeURIComponent(href.split(",")[1]);
 
+  assert.equal(original.isConnected, false);
   assert.equal(favicon.getAttribute("rel"), "icon");
-  assert.match(litIcon, /^data:image\/svg\+xml,/);
-  assert.match(litSvg, /<image /);
-  assert.match(
-    litSvg,
-    /href="https:\/\/example\.com\/favicon\.svg\?theme=dark&amp;v=1"/
-  );
-  assert.match(litSvg, /#ffd400/i);
-
-  blink();
-
-  const dimIcon = favicon.getAttribute("href");
-  const dimSvg = decodeURIComponent(dimIcon.split(",")[1]);
-
-  assert.notEqual(dimIcon, litIcon);
-  assert.match(dimSvg, /<image /);
-  assert.match(dimSvg, /#ad9300/i);
+  assert.equal(favicon.getAttribute("type"), "image/svg+xml");
+  assert.match(href, /^data:image\/svg\+xml,/);
+  assert.match(svg, /fill="#ffd400"/i);
+  assert.doesNotMatch(svg, /<image /i);
+  assert.equal(intervals, 0);
 
   execute("control.hide");
 });
 
-test("starts and stops the overlay and favicon indicator together", () => {
+test("starts and stops the overlay and yellow favicon together", () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
   const original = window.document.createElement("link");
   const following = window.document.createElement("meta");
 
-  original.setAttribute("rel", "shortcut icon");
+  original.setAttribute("rel", "icon");
   original.setAttribute("href", "/favicon.ico");
   following.setAttribute("name", "theme-color");
   window.document.head.append(original, following);
@@ -445,30 +446,18 @@ test("starts and stops the overlay and favicon indicator together", () => {
   );
   assert.equal(original.isConnected, true);
   assert.equal(original.nextSibling, following);
-  assert.equal(original.getAttribute("href"), "/favicon.ico");
 });
 
-test("restores the latest tab title after control ends", () => {
+test("does not interfere with page title updates", () => {
   const { execute, window } = createPage("<main>Inbox</main>");
-  let blink;
-  let clearedInterval;
 
   window.document.title = "Inbox";
-  window.setInterval = callback => {
-    blink = callback;
-    return 9;
-  };
-  window.clearInterval = interval => {
-    clearedInterval = interval;
-  };
 
   execute("control.show", { leaseMs: 1000 });
   window.document.title = "Updated Inbox";
-  blink();
   execute("control.hide");
 
   assert.equal(window.document.title, "Updated Inbox");
-  assert.equal(clearedInterval, 9);
 });
 
 test("hides the AI control indicator and its styles", () => {
@@ -493,6 +482,11 @@ test("hides the AI control indicator and its styles", () => {
 
 test("expires the AI control indicator after inactivity", async () => {
   const { execute, window } = createPage("<main>Dashboard</main>");
+  const original = window.document.createElement("link");
+
+  original.setAttribute("rel", "icon");
+  original.setAttribute("href", "/favicon.ico");
+  window.document.head.append(original);
 
   execute("control.show", { leaseMs: 5 });
   await new Promise(resolve => setTimeout(resolve, 20));
@@ -503,4 +497,11 @@ test("expires the AI control indicator after inactivity", async () => {
     ),
     null
   );
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control-favicon]"
+    ),
+    null
+  );
+  assert.equal(original.isConnected, true);
 });
