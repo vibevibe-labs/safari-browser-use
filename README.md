@@ -86,6 +86,30 @@ Restart Cursor after installation.
 
 </details>
 
+## First-Time Setup
+
+Before using browser automation, enable JavaScript from Apple Events in Safari.
+Safari Browser Use cannot inspect or interact with web pages while this setting
+is disabled.
+
+1. Open **Safari Settings → Advanced**, then enable
+   **Show features for web developers**.
+
+<p align="center">
+  <img src="plugins/safari-browser-use/assets/safari-setting-1.png" width="820" alt="Enable Show features for web developers in Safari Advanced settings"/>
+</p>
+
+2. Open **Safari Settings → Developer → Automation**, then enable
+   **Allow JavaScript from Apple Events**.
+
+<p align="center">
+  <img src="plugins/safari-browser-use/assets/safari-setting-2.png" width="820" alt="Enable Allow JavaScript from Apple Events in Safari Developer settings"/>
+</p>
+
+Safari also asks for macOS Automation permission the first time the plugin
+controls it. Approve that request only when you intend to let the current
+client automate Safari.
+
 ## Quick Start
 
 Open Safari, then ask your agent:
@@ -112,19 +136,6 @@ after 45 seconds without tab activity.
 | ✨ Visible control indicator | See a perimeter glow and fake cursor while AI control is active |
 | 🔌 Native agent plugins | Install directly in Codex, Claude Code, GitHub Copilot, or Cursor |
 | 🛡️ Deliberate interactions | Inspect first, target unique elements, and verify every action |
-
-## First-Time Setup
-
-Safari asks for Automation permission the first time the plugin controls it.
-Approve that request only when you intend to let the current client automate
-Safari.
-
-If Safari reports that JavaScript from Apple Events is disabled:
-
-1. Open **Safari Settings → Advanced**.
-2. Enable **Show features for web developers**.
-3. Open **Safari Settings → Developer → Automation**.
-4. Enable **Allow JavaScript from Apple Events**.
 
 ## Safety
 
