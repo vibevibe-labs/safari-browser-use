@@ -616,7 +616,7 @@ function runPageOperation(
 }
 
 
-const SUPPORTED_SAFARI_MAJOR = 26;
+const MAX_SUPPORTED_SAFARI_MAJOR = 26;
 
 function parseSafariMajor(version) {
   const match = /^(\d+)(?:\.|$)/.exec(version);
@@ -631,15 +631,15 @@ function parseSafariMajor(version) {
 function evaluateSafariVersion(version) {
   const major = parseSafariMajor(version);
 
-  if (major === SUPPORTED_SAFARI_MAJOR) {
+  if (major <= MAX_SUPPORTED_SAFARI_MAJOR) {
     return { supported: true, major, reason: null };
   }
 
-  const reason = major < SUPPORTED_SAFARI_MAJOR
-    ? `Safari 26 is required; found Safari ${major}.`
-    : `Safari ${major} is not supported; install Safari 26.`;
-
-  return { supported: false, major, reason };
+  return {
+    supported: false,
+    major,
+    reason: `Safari ${major} includes a native MCP server; use /usr/bin/safaridriver --mcp.`
+  };
 }
 
 

@@ -23,6 +23,22 @@ It connects through the Apple Events support built into macOS. It does not requi
 npm, a Safari extension, a companion app, Xcode, or an Apple Developer
 certificate.
 
+> [!NOTE]
+> **Safari version support:** Safari Browser Use supports Safari 26 and earlier
+> through Apple Events. Starting with Safari 27 beta, WebKit includes an
+> official Safari MCP server that lets any MCP-compatible agent connect
+> directly through `safaridriver --mcp`. Safari 27 users should prefer Apple's
+> native server. See
+> [Introducing the Safari MCP server for web developers](https://webkit.org/blog/18136/introducing-the-safari-mcp-server-for-web-developers/).
+
+## Demo
+
+<p align="center">
+  <img src="plugins/safari-browser-use/assets/safari-browser-use-demo.png" width="100%" alt="Safari Browser Use controlling an existing Safari tab with a visible perimeter glow and fake cursor"/>
+</p>
+
+<p align="center"><em>An AI agent inspecting an existing Safari tab with the visible control indicator enabled.</em></p>
+
 ## Installation
 
 ### Setup prompt
