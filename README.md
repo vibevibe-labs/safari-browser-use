@@ -23,6 +23,14 @@ It connects through the Apple Events support built into macOS. It does not requi
 npm, a Safari extension, a companion app, Xcode, or an Apple Developer
 certificate.
 
+## Demo
+
+<p align="center">
+  <img src="plugins/safari-browser-use/assets/safari-browser-use-demo.png" width="100%" alt="Safari Browser Use controlling an existing Safari tab with a visible perimeter glow and fake cursor"/>
+</p>
+
+<p align="center"><em>An AI agent inspecting an existing Safari tab with the visible control indicator enabled.</em></p>
+
 ## Installation
 
 ### Setup prompt
