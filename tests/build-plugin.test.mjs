@@ -67,6 +67,13 @@ test("builds a self-contained JXA MCP server", async t => {
       .length,
     2
   );
+  assert.match(bundle, /var SBU_DOCUMENTATION_TEXT = /);
+  assert.match(bundle, /var SBU_DOCUMENTATION_TROUBLESHOOTING_TEXT = /);
+  assert.match(bundle, /documentation: browserDocumentation/);
+  assert.match(bundle, /Safari Browser Use — Operating Guide/);
+  assert.match(bundle, /Browser Safety/);
+  assert.match(bundle, /Unknown documentation topic/);
+  assert.match(bundle, /instructions:/);
   assert.doesNotMatch(
     bundle,
     /data-safari-browser-use-control-favicon/
