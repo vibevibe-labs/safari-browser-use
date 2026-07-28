@@ -155,6 +155,94 @@ test("fills an element located by its label", () => {
   );
 });
 
+test("fills a contenteditable rich editor by locator", () => {
+  const { execute, window } = createPage(`
+    <div
+      id="editor"
+      role="textbox"
+      contenteditable="true"
+      aria-label="Document body"
+    >old text</div>
+  `);
+  const editor = window.document.querySelector("#editor");
+  const events = [];
+  for (const type of ["beforeinput", "input", "change"]) {
+    editor.addEventListener(type, event => {
+      events.push({ type: event.type, bubbles: event.bubbles });
+    });
+  }
+
+  assert.deepEqual(
+    execute("playwright.locator.fill", {
+      locator: [{
+        type: "role",
+        role: "textbox",
+        name: "Document body",
+        exact: true
+      }],
+      value: "new content"
+    }),
+    { filled: true }
+  );
+
+  assert.equal(editor.textContent, "new content");
+  assert.deepEqual(
+    events.map(event => event.type),
+    ["beforeinput", "input"]
+  );
+  assert.ok(events.every(event => event.bubbles === true));
+});
+
+test("types appended text into a contenteditable rich editor", () => {
+  const { execute, window } = createPage(`
+    <div id="editor" contenteditable="true" aria-label="Notes">Hello</div>
+  `);
+  const editor = window.document.querySelector("#editor");
+  let inputs = 0;
+  editor.addEventListener("input", () => inputs++);
+
+  assert.deepEqual(
+    execute("playwright.locator.type", {
+      locator: [{ type: "css", selector: "#editor" }],
+      value: " World"
+    }),
+    { typed: true }
+  );
+
+  assert.equal(editor.textContent, "Hello World");
+  assert.equal(inputs, 1);
+});
+
+test("clears a contenteditable rich editor when filled with empty text", () => {
+  const { execute, window } = createPage(`
+    <div id="editor" contenteditable="true" aria-label="Body">remove me</div>
+  `);
+
+  execute("playwright.locator.fill", {
+    locator: [{ type: "css", selector: "#editor" }],
+    value: ""
+  });
+
+  assert.equal(
+    window.document.querySelector("#editor").textContent,
+    ""
+  );
+});
+
+test("still rejects filling a non-editable element", () => {
+  const { execute } = createPage(`
+    <div id="static">read only</div>
+  `);
+
+  assert.throws(
+    () => execute("playwright.locator.fill", {
+      locator: [{ type: "css", selector: "#static" }],
+      value: "nope"
+    }),
+    /element_not_fillable/
+  );
+});
+
 test("reports locator state synchronously for JXA-side polling", () => {
   const { execute, window } = createPage("<main></main>");
   const params = {
@@ -568,4 +656,219 @@ test("expires the AI control indicator after inactivity", async () => {
     ),
     null
   );
+});
+
+test("captures a canvas as an image marker for the vision model", () => {
+  const { execute, window } = createPage(
+    `<canvas id="board" width="200" height="120"></canvas>`
+  );
+  const canvas = window.document.querySelector("#board");
+  canvas.getBoundingClientRect = () => ({
+    left: 40,
+    top: 24,
+    width: 200,
+    height: 120
+  });
+  canvas.toDataURL = () => "data:image/png;base64,QUJD";
+
+  const result = execute("playwright.locator.canvasSnapshot", {
+    locator: [{ type: "css", selector: "#board" }]
+  });
+
+  assert.deepEqual(result.__sbuImage, {
+    mimeType: "image/png",
+    base64: "QUJD",
+    width: 200,
+    height: 120
+  });
+  assert.deepEqual(result.source.viewport, {
+    x: 40,
+    y: 24,
+    width: 200,
+    height: 120
+  });
+  assert.equal(result.source.width, 200);
+  assert.equal(result.source.height, 120);
+});
+
+test("downsamples oversized canvases below maxSize", () => {
+  const { execute, window } = createPage(
+    `<canvas id="huge" width="4000" height="2000"></canvas>`
+  );
+  const canvas = window.document.querySelector("#huge");
+  canvas.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 4000,
+    height: 2000
+  });
+
+  const result = execute("playwright.locator.canvasSnapshot", {
+    locator: [{ type: "css", selector: "#huge" }],
+    maxSize: 1000
+  });
+
+  assert.equal(result.__sbuImage.width, 1000);
+  assert.equal(result.__sbuImage.height, 500);
+  assert.equal(result.source.width, 4000);
+});
+
+test("rejects capturing a non-canvas element", () => {
+  const { execute } = createPage(`<div id="not-canvas"></div>`);
+
+  assert.throws(
+    () => execute("playwright.locator.canvasSnapshot", {
+      locator: [{ type: "css", selector: "#not-canvas" }]
+    }),
+    /not_a_canvas/
+  );
+});
+
+test("maps a cross-origin tainted canvas to a clear error", () => {
+  const { execute, window } = createPage(
+    `<canvas id="tainted" width="10" height="10"></canvas>`
+  );
+  window.document.querySelector("#tainted").toDataURL = () => {
+    throw new Error("The operation is insecure.");
+  };
+
+  assert.throws(
+    () => execute("playwright.locator.canvasSnapshot", {
+      locator: [{ type: "css", selector: "#tainted" }]
+    }),
+    /canvas_tainted_cross_origin/
+  );
+});
+
+test("dispatches a coordinate pointer event at a canvas position", () => {
+  const { execute, window } = createPage(
+    `<canvas id="stage" width="300" height="150"></canvas>`
+  );
+  const canvas = window.document.querySelector("#stage");
+  window.document.elementFromPoint = () => canvas;
+  const received = [];
+  canvas.addEventListener("pointerdown", event => {
+    received.push({
+      type: event.type,
+      x: event.clientX,
+      y: event.clientY,
+      buttons: event.buttons
+    });
+  });
+
+  const result = execute("playwright.mouseEvent", {
+    type: "pointerdown",
+    x: 80,
+    y: 54,
+    buttons: 1
+  });
+
+  assert.equal(result.type, "pointerdown");
+  assert.equal(result.target, "canvas");
+  assert.deepEqual(received, [{
+    type: "pointerdown",
+    x: 80,
+    y: 54,
+    buttons: 1
+  }]);
+});
+
+test("also emits the mouse-equivalent for pointer gestures", () => {
+  const { execute, window } = createPage(
+    `<canvas id="stage" width="300" height="150"></canvas>`
+  );
+  const canvas = window.document.querySelector("#stage");
+  window.document.elementFromPoint = () => canvas;
+  let mouseUps = 0;
+  canvas.addEventListener("mouseup", () => mouseUps++);
+
+  execute("playwright.mouseEvent", {
+    type: "pointerup",
+    x: 10,
+    y: 10,
+    buttons: 0
+  });
+
+  assert.equal(mouseUps, 1);
+});
+
+test("rejects a pointer event without finite coordinates", () => {
+  const { execute } = createPage(`<main></main>`);
+
+  assert.throws(
+    () => execute("playwright.mouseEvent", {
+      type: "pointermove",
+      x: "nope",
+      y: 10
+    }),
+    /invalid_coordinates/
+  );
+});
+
+test("assigns uploaded files to a file input via DataTransfer", () => {
+  const { execute, window } = createPage(
+    `<input id="upload" type="file">`
+  );
+  const input = window.document.querySelector("#upload");
+  const changes = [];
+  input.addEventListener("change", () => {
+    changes.push([...input.files].map(file => file.name));
+  });
+
+  const result = execute("playwright.locator.setInputFiles", {
+    locator: [{ type: "css", selector: "#upload" }],
+    files: [{
+      name: "report.txt",
+      mimeType: "text/plain",
+      base64: "SEVMTE8="
+    }]
+  });
+
+  assert.equal(result.via, "input");
+  assert.deepEqual(result.files, [{
+    name: "report.txt",
+    size: 5,
+    type: "text/plain"
+  }]);
+  assert.equal(input.files.length, 1);
+  assert.equal(input.files[0].name, "report.txt");
+  assert.deepEqual(changes, [["report.txt"]]);
+});
+
+test("rejects setInputFiles on a non-file input", () => {
+  const { execute } = createPage(`<input id="text" type="text">`);
+
+  assert.throws(
+    () => execute("playwright.locator.setInputFiles", {
+      locator: [{ type: "css", selector: "#text" }],
+      files: [{ name: "a.txt", base64: "QQ==" }]
+    }),
+    /element_not_file_input/
+  );
+});
+
+test("delivers dropped files to a drop zone handler", () => {
+  const { execute, window } = createPage(
+    `<div id="zone" style="width:200px;height:80px"></div>`
+  );
+  const zone = window.document.querySelector("#zone");
+  let dropped = null;
+  zone.addEventListener("drop", event => {
+    dropped = [...event.dataTransfer.files].map(file => ({
+      name: file.name,
+      size: file.size
+    }));
+  });
+
+  const result = execute("playwright.locator.dropFiles", {
+    locator: [{ type: "css", selector: "#zone" }],
+    files: [{
+      name: "photo.png",
+      mimeType: "image/png",
+      base64: "SEVMTE8="
+    }]
+  });
+
+  assert.equal(result.via, "drop");
+  assert.deepEqual(dropped, [{ name: "photo.png", size: 5 }]);
 });

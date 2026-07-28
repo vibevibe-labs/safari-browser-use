@@ -239,6 +239,71 @@ var run = (function (globalObject) {
     return envelope.value;
   }
 
+  function runGesture(params) {
+    var steps = params.steps || [];
+    var delayMs = Number(params.delayMs) > 0 ? Number(params.delayMs) : 90;
+    var dispatched = 0;
+
+    for (var index = 0; index < steps.length; index++) {
+      var step = steps[index];
+      step.tabId = params.tabId;
+      runPage("playwright.mouseEvent", step);
+      dispatched += 1;
+
+      if (index < steps.length - 1) {
+        foundation.NSThread.sleepForTimeInterval(delayMs / 1000);
+      }
+    }
+
+    return { steps: dispatched };
+  }
+
+  function mimeTypeForPath(path) {
+    var lower = String(path).toLowerCase();
+    var extension = lower.slice(lower.lastIndexOf(".") + 1);
+    var types = {
+      txt: "text/plain",
+      csv: "text/csv",
+      json: "application/json",
+      pdf: "application/pdf",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+      html: "text/html",
+      md: "text/markdown",
+      zip: "application/zip"
+    };
+
+    return types[extension] || "application/octet-stream";
+  }
+
+  function readLocalFiles(paths) {
+    var list = Array.isArray(paths) ? paths : [paths];
+    var files = [];
+
+    for (var index = 0; index < list.length; index++) {
+      var path = String(list[index]);
+      var data = foundation.NSData.dataWithContentsOfFile(path);
+
+      if (!data) {
+        throw new Error("file_not_found: " + path);
+      }
+
+      var name = path.slice(path.lastIndexOf("/") + 1) || path;
+
+      files.push({
+        name: name,
+        mimeType: mimeTypeForPath(path),
+        base64: data.base64EncodedStringWithOptions(0).js
+      });
+    }
+
+    return files;
+  }
+
   var controlLifecycle = createControlLifecycle({
     show: function (tabId) {
       try {
@@ -437,6 +502,10 @@ var run = (function (globalObject) {
 
     if (method === "playwright.locator.waitFor") {
       return waitFor(params);
+    }
+
+    if (method === "playwright.gesture") {
+      return runGesture(params);
     }
 
     if (method.indexOf("playwright.") === 0) {
@@ -726,6 +795,25 @@ var run = (function (globalObject) {
     });
   };
 
+  SafariLocator.prototype.canvasSnapshot = function (options) {
+    options = options || {};
+    return this.call("canvasSnapshot", {
+      maxSize: options.maxSize
+    });
+  };
+
+  SafariLocator.prototype.setInputFiles = function (paths) {
+    return this.call("setInputFiles", {
+      files: readLocalFiles(paths)
+    });
+  };
+
+  SafariLocator.prototype.dropFiles = function (paths) {
+    return this.call("dropFiles", {
+      files: readLocalFiles(paths)
+    });
+  };
+
   function SafariPlaywright(tabIdentity) {
     this.tabIdentity = tabIdentity;
   }
@@ -776,6 +864,83 @@ var run = (function (globalObject) {
   SafariPlaywright.prototype.domSnapshot = function () {
     return callSafari("playwright.domSnapshot", {
       tabIdentity: this.tabIdentity
+    });
+  };
+
+  SafariPlaywright.prototype.canvasSnapshot = function (
+    selector,
+    options
+  ) {
+    return this.locator(selector).canvasSnapshot(options);
+  };
+
+  SafariPlaywright.prototype.clickAt = function (x, y, options) {
+    options = options || {};
+    var point = { x: Number(x), y: Number(y) };
+    var steps = [
+      { type: "pointermove", x: point.x, y: point.y, buttons: 0 },
+      {
+        type: "pointerdown",
+        x: point.x,
+        y: point.y,
+        button: 0,
+        buttons: 1
+      },
+      {
+        type: "pointerup",
+        x: point.x,
+        y: point.y,
+        button: 0,
+        buttons: 0
+      },
+      { type: "click", x: point.x, y: point.y, button: 0, buttons: 0 }
+    ];
+
+    return callSafari("playwright.gesture", {
+      tabIdentity: this.tabIdentity,
+      steps: steps,
+      delayMs: options.delayMs
+    });
+  };
+
+  SafariPlaywright.prototype.drag = function (
+    fromX,
+    fromY,
+    toX,
+    toY,
+    options
+  ) {
+    options = options || {};
+    var from = { x: Number(fromX), y: Number(fromY) };
+    var to = { x: Number(toX), y: Number(toY) };
+    var count = Number(options.steps) > 0 ? Number(options.steps) : 8;
+    var steps = [
+      { type: "pointermove", x: from.x, y: from.y, buttons: 0 },
+      { type: "pointerdown", x: from.x, y: from.y, button: 0, buttons: 1 }
+    ];
+
+    for (var index = 1; index <= count; index++) {
+      var ratio = index / count;
+      steps.push({
+        type: "pointermove",
+        x: Math.round(from.x + (to.x - from.x) * ratio),
+        y: Math.round(from.y + (to.y - from.y) * ratio),
+        buttons: 1
+      });
+    }
+
+    steps.push({
+      type: "pointerup",
+      x: to.x,
+      y: to.y,
+      button: 0,
+      buttons: 0
+    });
+
+    return callSafari("playwright.gesture", {
+      tabIdentity: this.tabIdentity,
+      steps: steps,
+      delayMs: options.delayMs
     });
   };
 
@@ -954,8 +1119,63 @@ var run = (function (globalObject) {
     }
   }
 
+  function imageMarker(value) {
+    if (
+      value &&
+      typeof value === "object" &&
+      value.__sbuImage &&
+      typeof value.__sbuImage === "object" &&
+      typeof value.__sbuImage.base64 === "string"
+    ) {
+      return value.__sbuImage;
+    }
+
+    return null;
+  }
+
   function toolResult(result) {
     var lines = result.output.slice();
+    var marker = imageMarker(result.value);
+
+    if (marker) {
+      var summary = {
+        mimeType: marker.mimeType || "image/png",
+        width: marker.width,
+        height: marker.height,
+        bytes: marker.base64.length
+      };
+      var structured = {};
+      var key;
+
+      for (key in result.value) {
+        if (
+          Object.prototype.hasOwnProperty.call(result.value, key) &&
+          key !== "__sbuImage"
+        ) {
+          structured[key] = result.value[key];
+        }
+      }
+
+      structured.image = summary;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: lines.concat([stringify(summary)]).join("\n")
+          },
+          {
+            type: "image",
+            data: marker.base64,
+            mimeType: summary.mimeType
+          }
+        ],
+        structuredContent: {
+          value: jsonValue(structured),
+          output: result.output
+        }
+      };
+    }
 
     if (result.value !== undefined) {
       lines.push(stringify(result.value));

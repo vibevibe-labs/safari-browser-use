@@ -350,7 +350,30 @@ export function runPageOperation(
     return matches[0];
   }
 
+  function isContentEditable(element) {
+    return element.getAttribute("contenteditable") === "true" ||
+      element.isContentEditable === true;
+  }
+
+  function fillContentEditable(element, value) {
+    const text = String(value);
+
+    element.focus?.();
+    element.dispatchEvent(
+      new window.Event("beforeinput", { bubbles: true })
+    );
+    element.textContent = text;
+    element.dispatchEvent(
+      new window.Event("input", { bubbles: true })
+    );
+  }
+
   function fillElement(element, value) {
+    if (isContentEditable(element)) {
+      fillContentEditable(element, value);
+      return;
+    }
+
     if (!("value" in element)) {
       throw new Error("element_not_fillable");
     }
@@ -362,6 +385,239 @@ export function runPageOperation(
     element.dispatchEvent(
       new window.Event("change", { bubbles: true })
     );
+  }
+
+  function appendToElement(element, value) {
+    if (isContentEditable(element)) {
+      fillContentEditable(
+        element,
+        `${element.textContent ?? ""}${value}`
+      );
+      return;
+    }
+
+    fillElement(element, `${element.value ?? ""}${value}`);
+  }
+
+  function decodeBase64(base64) {
+    const decode = window.atob || (typeof atob === "function" ? atob : null);
+
+    if (!decode) {
+      throw new Error("base64_decode_unavailable");
+    }
+
+    const binary = decode(String(base64));
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  function buildFileTransfer(files) {
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new Error("no_files_provided");
+    }
+
+    const dataTransfer = new window.DataTransfer();
+    const meta = [];
+
+    for (const spec of files) {
+      if (
+        !spec ||
+        typeof spec.name !== "string" ||
+        typeof spec.base64 !== "string"
+      ) {
+        throw new Error("invalid_file_spec");
+      }
+
+      const file = new window.File(
+        [decodeBase64(spec.base64)],
+        spec.name,
+        { type: spec.mimeType || "application/octet-stream" }
+      );
+      dataTransfer.items.add(file);
+      meta.push({ name: file.name, size: file.size, type: file.type });
+    }
+
+    return { dataTransfer, meta };
+  }
+
+  function canvasSnapshot(element, options) {
+    if (!element || element.tagName.toLowerCase() !== "canvas") {
+      throw new Error("not_a_canvas");
+    }
+
+    const sourceWidth = Number(element.width) || 0;
+    const sourceHeight = Number(element.height) || 0;
+    const maxSize = Number(options.maxSize) > 0
+      ? Number(options.maxSize)
+      : 1280;
+    const longestEdge = Math.max(sourceWidth, sourceHeight) || 1;
+
+    let outputWidth = sourceWidth;
+    let outputHeight = sourceHeight;
+    let exportCanvas = element;
+
+    if (longestEdge > maxSize) {
+      const scale = maxSize / longestEdge;
+      outputWidth = Math.max(1, Math.round(sourceWidth * scale));
+      outputHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+      const scaled = document.createElement("canvas");
+      scaled.width = outputWidth;
+      scaled.height = outputHeight;
+
+      const scaledContext = scaled.getContext("2d");
+
+      if (scaledContext) {
+        scaledContext.drawImage(element, 0, 0, outputWidth, outputHeight);
+      }
+
+      exportCanvas = scaled;
+    }
+
+    let dataUrl;
+
+    try {
+      dataUrl = exportCanvas.toDataURL("image/png");
+    } catch (error) {
+      throw new Error("canvas_tainted_cross_origin");
+    }
+
+    const separator = dataUrl.indexOf(",");
+    const base64 = separator === -1 ? "" : dataUrl.slice(separator + 1);
+
+    let blank = false;
+
+    try {
+      const sampleMax = 96;
+      const sampleLongest = Math.max(outputWidth, outputHeight) || 1;
+      const sampleScale = sampleLongest > sampleMax
+        ? sampleMax / sampleLongest
+        : 1;
+      const sampleWidth = Math.max(1, Math.round(outputWidth * sampleScale));
+      const sampleHeight = Math.max(1, Math.round(outputHeight * sampleScale));
+
+      const sampler = document.createElement("canvas");
+      sampler.width = sampleWidth;
+      sampler.height = sampleHeight;
+
+      const context = sampler.getContext("2d");
+
+      if (!context) {
+        throw new Error("no_2d_context");
+      }
+
+      context.drawImage(exportCanvas, 0, 0, sampleWidth, sampleHeight);
+
+      const pixels = context.getImageData(
+        0,
+        0,
+        sampleWidth,
+        sampleHeight
+      ).data;
+
+      blank = true;
+
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] !== 0) {
+          blank = false;
+          break;
+        }
+      }
+    } catch (error) {
+      blank = false;
+    }
+
+    const rect = element.getBoundingClientRect
+      ? element.getBoundingClientRect()
+      : { left: 0, top: 0, width: sourceWidth, height: sourceHeight };
+
+    return {
+      __sbuImage: {
+        mimeType: "image/png",
+        base64,
+        width: outputWidth,
+        height: outputHeight
+      },
+      source: {
+        width: sourceWidth,
+        height: sourceHeight,
+        viewport: {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height
+        }
+      },
+      blank
+    };
+  }
+
+  function dispatchMouseEvent(params) {
+    const x = Number(params.x);
+    const y = Number(params.y);
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error("invalid_coordinates");
+    }
+
+    const type = String(params.type);
+    const button = Number(params.button ?? 0);
+    const buttons = Number(params.buttons ?? 0);
+    const pointerId = Number(params.pointerId ?? 1);
+    const target =
+      (document.elementFromPoint && document.elementFromPoint(x, y)) ||
+      document.documentElement ||
+      document.body;
+
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      button,
+      buttons
+    };
+
+    if (type.indexOf("pointer") === 0 && window.PointerEvent) {
+      target.dispatchEvent(
+        new window.PointerEvent(
+          type,
+          Object.assign({}, base, {
+            pointerId,
+            pointerType: "mouse",
+            isPrimary: true,
+            pressure: buttons ? 0.5 : 0
+          })
+        )
+      );
+    }
+
+    const mouseType = {
+      pointerdown: "mousedown",
+      pointermove: "mousemove",
+      pointerup: "mouseup",
+      click: "click"
+    }[type];
+
+    if (mouseType && window.MouseEvent) {
+      target.dispatchEvent(new window.MouseEvent(mouseType, base));
+    }
+
+    return {
+      type,
+      target: target && target.tagName
+        ? target.tagName.toLowerCase()
+        : null,
+      x,
+      y
+    };
   }
 
   function domSnapshot() {
@@ -435,6 +691,10 @@ export function runPageOperation(
 
     window.scrollBy(deltaX, deltaY);
     return { deltaX, deltaY };
+  }
+
+  if (method === "playwright.mouseEvent") {
+    return dispatchMouseEvent(params);
   }
 
   if (method === "control.show") {
@@ -512,14 +772,68 @@ export function runPageOperation(
       });
       element.click();
       return { clicked: true };
+    case "canvasSnapshot":
+      return canvasSnapshot(element, params);
+    case "setInputFiles": {
+      if (
+        element.tagName.toLowerCase() !== "input" ||
+        (element.getAttribute("type") ?? "").toLowerCase() !== "file"
+      ) {
+        throw new Error("element_not_file_input");
+      }
+
+      const { dataTransfer, meta } = buildFileTransfer(params.files);
+      element.files = dataTransfer.files;
+      element.dispatchEvent(
+        new window.Event("input", { bubbles: true })
+      );
+      element.dispatchEvent(
+        new window.Event("change", { bubbles: true })
+      );
+      return { files: meta, via: "input" };
+    }
+    case "dropFiles": {
+      const { dataTransfer, meta } = buildFileTransfer(params.files);
+      const options = { bubbles: true, cancelable: true };
+
+      for (const eventType of ["dragenter", "dragover", "drop"]) {
+        let event;
+
+        try {
+          event = new window.DragEvent(
+            eventType,
+            Object.assign({}, options, { dataTransfer })
+          );
+        } catch (error) {
+          event = new window.Event(eventType, options);
+        }
+
+        if (event.dataTransfer !== dataTransfer) {
+          try {
+            Object.defineProperty(event, "dataTransfer", {
+              configurable: true,
+              value: dataTransfer
+            });
+          } catch (defineError) {
+            try {
+              event.dataTransfer = dataTransfer;
+            } catch (assignError) {
+              // Some engines expose dataTransfer as read-only; the
+              // constructor init above already carries it in Safari.
+            }
+          }
+        }
+
+        element.dispatchEvent(event);
+      }
+
+      return { files: meta, via: "drop" };
+    }
     case "fill":
       fillElement(element, params.value);
       return { filled: true };
     case "type":
-      fillElement(
-        element,
-        `${element.value ?? ""}${params.value}`
-      );
+      appendToElement(element, params.value);
       return { typed: true };
     case "press": {
       const key = String(params.value);
