@@ -26,6 +26,10 @@ function runPageOperation(
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
+  const highlightAttribute =
+    "data-safari-browser-use-highlight";
+  const highlightStyleId =
+    "__safari_browser_use_highlight_style__";
 
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
@@ -142,6 +146,174 @@ function runPageOperation(
       requestedLeaseMs > 0
       ? Math.min(requestedLeaseMs, 300_000)
       : 45_000;
+  }
+
+  function controlCursorElement() {
+    return document.querySelector(`[${controlCursorAttribute}]`);
+  }
+
+  function prefersReducedMotion() {
+    return (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  function moveControlCursorTo(point, options = {}) {
+    if (
+      !point ||
+      !Number.isFinite(point.x) ||
+      !Number.isFinite(point.y)
+    ) {
+      return { moved: false };
+    }
+
+    showControlIndicator(options);
+
+    const cursor = controlCursorElement();
+
+    if (!cursor) {
+      return { moved: false };
+    }
+
+    const glideMs = Number.isFinite(Number(options.glideMs))
+      ? Number(options.glideMs)
+      : 320;
+
+    cursor.style.right = "auto";
+    cursor.style.bottom = "auto";
+    cursor.style.transition = prefersReducedMotion()
+      ? "none"
+      : `left ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1), ` +
+        `top ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    cursor.style.left = `${point.x - 3}px`;
+    cursor.style.top = `${point.y - 2}px`;
+
+    return { moved: true, x: point.x, y: point.y };
+  }
+
+  function pointerablePoint(element) {
+    if (
+      !element ||
+      typeof element.getBoundingClientRect !== "function"
+    ) {
+      return null;
+    }
+
+    const rect = element.getBoundingClientRect();
+
+    if (!rect || (!rect.width && !rect.height)) {
+      return null;
+    }
+
+    // Aim near the centre with a small imprecise offset so the
+    // cursor lands naturally rather than pixel-perfectly.
+    const jitterX = (Math.random() - 0.5) * Math.min(rect.width, 24);
+    const jitterY = (Math.random() - 0.5) * Math.min(rect.height, 16);
+    const viewportWidth = window.innerWidth || rect.right;
+    const viewportHeight = window.innerHeight || rect.bottom;
+    const x = Math.max(
+      2,
+      Math.min(rect.left + rect.width / 2 + jitterX, viewportWidth - 2)
+    );
+    const y = Math.max(
+      2,
+      Math.min(rect.top + rect.height / 2 + jitterY, viewportHeight - 2)
+    );
+
+    return { x, y };
+  }
+
+  function moveControlCursorToElement(element, options) {
+    try {
+      return moveControlCursorTo(pointerablePoint(element), options);
+    } catch (error) {
+      // The cursor illusion must never break a real operation.
+      return { moved: false };
+    }
+  }
+
+  function ensureHighlightStyle() {
+    if (document.getElementById(highlightStyleId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = highlightStyleId;
+    style.textContent = `
+      @keyframes __safari_browser_use_highlight_fade__ {
+        0% { opacity: 1; transform: scale(1.03); }
+        5% { opacity: 1; transform: scale(1); }
+        25% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1); }
+      }
+
+      [${highlightAttribute}] {
+        animation:
+          __safari_browser_use_highlight_fade__
+          3000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${highlightAttribute}] {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).append(style);
+  }
+
+  function highlightElement(element) {
+    try {
+      const rect =
+        element && typeof element.getBoundingClientRect === "function"
+          ? element.getBoundingClientRect()
+          : null;
+
+      if (!rect || (!rect.width && !rect.height)) {
+        return { highlighted: false };
+      }
+
+      ensureHighlightStyle();
+
+      const pad = 4;
+      const glow = document.createElement("div");
+      glow.setAttribute(highlightAttribute, "");
+      glow.setAttribute("aria-hidden", "true");
+      Object.assign(glow.style, {
+        position: "fixed",
+        left: `${rect.left - pad}px`,
+        top: `${rect.top - pad}px`,
+        width: `${rect.width + pad * 2}px`,
+        height: `${rect.height + pad * 2}px`,
+        boxSizing: "border-box",
+        pointerEvents: "none",
+        zIndex: "2147483646",
+        borderRadius: "10px",
+        border: "2px solid rgba(255, 148, 0, 0.95)",
+        backgroundColor: "rgba(255, 152, 32, 0.12)",
+        boxShadow: [
+          "0 0 0 3px rgba(255, 165, 40, 0.55)",
+          "0 0 16px 4px rgba(255, 140, 0, 0.80)",
+          "0 0 38px 12px rgba(255, 120, 0, 0.45)"
+        ].join(", "),
+        willChange: "opacity, transform"
+      });
+
+      const remove = () => glow.remove();
+      glow.addEventListener("animationend", remove);
+      // Fallback removal in case the animation event never fires.
+      window.setTimeout(remove, 3200);
+
+      document.documentElement.append(glow);
+
+      return { highlighted: true };
+    } catch (error) {
+      // The highlight is decorative and must never break an operation.
+      return { highlighted: false };
+    }
   }
 
   function normalizeText(value) {
@@ -352,7 +524,30 @@ function runPageOperation(
     return matches[0];
   }
 
+  function isContentEditable(element) {
+    return element.getAttribute("contenteditable") === "true" ||
+      element.isContentEditable === true;
+  }
+
+  function fillContentEditable(element, value) {
+    const text = String(value);
+
+    element.focus?.();
+    element.dispatchEvent(
+      new window.Event("beforeinput", { bubbles: true })
+    );
+    element.textContent = text;
+    element.dispatchEvent(
+      new window.Event("input", { bubbles: true })
+    );
+  }
+
   function fillElement(element, value) {
+    if (isContentEditable(element)) {
+      fillContentEditable(element, value);
+      return;
+    }
+
     if (!("value" in element)) {
       throw new Error("element_not_fillable");
     }
@@ -364,6 +559,247 @@ function runPageOperation(
     element.dispatchEvent(
       new window.Event("change", { bubbles: true })
     );
+  }
+
+  function appendToElement(element, value) {
+    if (isContentEditable(element)) {
+      fillContentEditable(
+        element,
+        `${element.textContent ?? ""}${value}`
+      );
+      return;
+    }
+
+    fillElement(element, `${element.value ?? ""}${value}`);
+  }
+
+  function decodeBase64(base64) {
+    const decode = window.atob || (typeof atob === "function" ? atob : null);
+
+    if (!decode) {
+      throw new Error("base64_decode_unavailable");
+    }
+
+    const binary = decode(String(base64));
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  function buildFileTransfer(files) {
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new Error("no_files_provided");
+    }
+
+    const dataTransfer = new window.DataTransfer();
+    const meta = [];
+
+    for (const spec of files) {
+      if (
+        !spec ||
+        typeof spec.name !== "string" ||
+        typeof spec.base64 !== "string"
+      ) {
+        throw new Error("invalid_file_spec");
+      }
+
+      const file = new window.File(
+        [decodeBase64(spec.base64)],
+        spec.name,
+        { type: spec.mimeType || "application/octet-stream" }
+      );
+      dataTransfer.items.add(file);
+      meta.push({ name: file.name, size: file.size, type: file.type });
+    }
+
+    return { dataTransfer, meta };
+  }
+
+  function canvasSnapshot(element, options) {
+    if (!element || element.tagName.toLowerCase() !== "canvas") {
+      throw new Error("not_a_canvas");
+    }
+
+    const sourceWidth = Number(element.width) || 0;
+    const sourceHeight = Number(element.height) || 0;
+    const maxSize = Number(options.maxSize) > 0
+      ? Number(options.maxSize)
+      : 1280;
+    const longestEdge = Math.max(sourceWidth, sourceHeight) || 1;
+
+    let outputWidth = sourceWidth;
+    let outputHeight = sourceHeight;
+    let exportCanvas = element;
+
+    if (longestEdge > maxSize) {
+      const scale = maxSize / longestEdge;
+      outputWidth = Math.max(1, Math.round(sourceWidth * scale));
+      outputHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+      const scaled = document.createElement("canvas");
+      scaled.width = outputWidth;
+      scaled.height = outputHeight;
+
+      const scaledContext = scaled.getContext("2d");
+
+      if (scaledContext) {
+        scaledContext.drawImage(element, 0, 0, outputWidth, outputHeight);
+      }
+
+      exportCanvas = scaled;
+    }
+
+    let dataUrl;
+
+    try {
+      dataUrl = exportCanvas.toDataURL("image/png");
+    } catch (error) {
+      throw new Error("canvas_tainted_cross_origin");
+    }
+
+    const separator = dataUrl.indexOf(",");
+    const base64 = separator === -1 ? "" : dataUrl.slice(separator + 1);
+
+    let blank = false;
+
+    try {
+      const sampleMax = 96;
+      const sampleLongest = Math.max(outputWidth, outputHeight) || 1;
+      const sampleScale = sampleLongest > sampleMax
+        ? sampleMax / sampleLongest
+        : 1;
+      const sampleWidth = Math.max(1, Math.round(outputWidth * sampleScale));
+      const sampleHeight = Math.max(1, Math.round(outputHeight * sampleScale));
+
+      const sampler = document.createElement("canvas");
+      sampler.width = sampleWidth;
+      sampler.height = sampleHeight;
+
+      const context = sampler.getContext("2d");
+
+      if (!context) {
+        throw new Error("no_2d_context");
+      }
+
+      context.drawImage(exportCanvas, 0, 0, sampleWidth, sampleHeight);
+
+      const pixels = context.getImageData(
+        0,
+        0,
+        sampleWidth,
+        sampleHeight
+      ).data;
+
+      blank = true;
+
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] !== 0) {
+          blank = false;
+          break;
+        }
+      }
+    } catch (error) {
+      blank = false;
+    }
+
+    const rect = element.getBoundingClientRect
+      ? element.getBoundingClientRect()
+      : { left: 0, top: 0, width: sourceWidth, height: sourceHeight };
+
+    return {
+      __sbuImage: {
+        mimeType: "image/png",
+        base64,
+        width: outputWidth,
+        height: outputHeight
+      },
+      source: {
+        width: sourceWidth,
+        height: sourceHeight,
+        viewport: {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height
+        }
+      },
+      blank
+    };
+  }
+
+  function dispatchMouseEvent(params) {
+    const x = Number(params.x);
+    const y = Number(params.y);
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error("invalid_coordinates");
+    }
+
+    const type = String(params.type);
+    const button = Number(params.button ?? 0);
+    const buttons = Number(params.buttons ?? 0);
+    const pointerId = Number(params.pointerId ?? 1);
+    const target =
+      (document.elementFromPoint && document.elementFromPoint(x, y)) ||
+      document.documentElement ||
+      document.body;
+
+    // Glide the fake cursor along the coordinate path so a person
+    // watching sees the pointer travel to where the AI is acting.
+    try {
+      moveControlCursorTo({ x, y }, { glideMs: 90 });
+    } catch (error) {
+      // never let the illusion break a real gesture
+    }
+
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      button,
+      buttons
+    };
+
+    if (type.indexOf("pointer") === 0 && window.PointerEvent) {
+      target.dispatchEvent(
+        new window.PointerEvent(
+          type,
+          Object.assign({}, base, {
+            pointerId,
+            pointerType: "mouse",
+            isPrimary: true,
+            pressure: buttons ? 0.5 : 0
+          })
+        )
+      );
+    }
+
+    const mouseType = {
+      pointerdown: "mousedown",
+      pointermove: "mousemove",
+      pointerup: "mouseup",
+      click: "click"
+    }[type];
+
+    if (mouseType && window.MouseEvent) {
+      target.dispatchEvent(new window.MouseEvent(mouseType, base));
+    }
+
+    return {
+      type,
+      target: target && target.tagName
+        ? target.tagName.toLowerCase()
+        : null,
+      x,
+      y
+    };
   }
 
   function domSnapshot() {
@@ -439,6 +875,10 @@ function runPageOperation(
     return { deltaX, deltaY };
   }
 
+  if (method === "playwright.mouseEvent") {
+    return dispatchMouseEvent(params);
+  }
+
   if (method === "control.show") {
     return showControlIndicator(params);
   }
@@ -506,22 +946,98 @@ function runPageOperation(
 
   const element = oneLocatorElement(params.locator);
 
+  const pointerOperations = new Set([
+    "click",
+    "fill",
+    "type",
+    "press",
+    "check",
+    "uncheck",
+    "setChecked",
+    "selectOption",
+    "setInputFiles",
+    "dropFiles"
+  ]);
+
+  if (pointerOperations.has(operation)) {
+    moveControlCursorToElement(element, params);
+    if (operation !== "click") {
+      highlightElement(element);
+    }
+  }
+
   switch (operation) {
     case "click":
       element.scrollIntoView?.({
         block: "center",
         inline: "center"
       });
+      moveControlCursorToElement(element, params);
+      highlightElement(element);
       element.click();
       return { clicked: true };
+    case "canvasSnapshot":
+      return canvasSnapshot(element, params);
+    case "setInputFiles": {
+      if (
+        element.tagName.toLowerCase() !== "input" ||
+        (element.getAttribute("type") ?? "").toLowerCase() !== "file"
+      ) {
+        throw new Error("element_not_file_input");
+      }
+
+      const { dataTransfer, meta } = buildFileTransfer(params.files);
+      element.files = dataTransfer.files;
+      element.dispatchEvent(
+        new window.Event("input", { bubbles: true })
+      );
+      element.dispatchEvent(
+        new window.Event("change", { bubbles: true })
+      );
+      return { files: meta, via: "input" };
+    }
+    case "dropFiles": {
+      const { dataTransfer, meta } = buildFileTransfer(params.files);
+      const options = { bubbles: true, cancelable: true };
+
+      for (const eventType of ["dragenter", "dragover", "drop"]) {
+        let event;
+
+        try {
+          event = new window.DragEvent(
+            eventType,
+            Object.assign({}, options, { dataTransfer })
+          );
+        } catch (error) {
+          event = new window.Event(eventType, options);
+        }
+
+        if (event.dataTransfer !== dataTransfer) {
+          try {
+            Object.defineProperty(event, "dataTransfer", {
+              configurable: true,
+              value: dataTransfer
+            });
+          } catch (defineError) {
+            try {
+              event.dataTransfer = dataTransfer;
+            } catch (assignError) {
+              // Some engines expose dataTransfer as read-only; the
+              // constructor init above already carries it in Safari.
+            }
+          }
+        }
+
+        element.dispatchEvent(event);
+      }
+
+      return { files: meta, via: "drop" };
+    }
     case "fill":
       fillElement(element, params.value);
       return { filled: true };
     case "type":
-      fillElement(
-        element,
-        `${element.value ?? ""}${params.value}`
-      );
+      appendToElement(element, params.value);
       return { typed: true };
     case "press": {
       const key = String(params.value);
@@ -1007,6 +1523,71 @@ var run = (function (globalObject) {
     return envelope.value;
   }
 
+  function runGesture(params) {
+    var steps = params.steps || [];
+    var delayMs = Number(params.delayMs) > 0 ? Number(params.delayMs) : 90;
+    var dispatched = 0;
+
+    for (var index = 0; index < steps.length; index++) {
+      var step = steps[index];
+      step.tabId = params.tabId;
+      runPage("playwright.mouseEvent", step);
+      dispatched += 1;
+
+      if (index < steps.length - 1) {
+        foundation.NSThread.sleepForTimeInterval(delayMs / 1000);
+      }
+    }
+
+    return { steps: dispatched };
+  }
+
+  function mimeTypeForPath(path) {
+    var lower = String(path).toLowerCase();
+    var extension = lower.slice(lower.lastIndexOf(".") + 1);
+    var types = {
+      txt: "text/plain",
+      csv: "text/csv",
+      json: "application/json",
+      pdf: "application/pdf",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+      html: "text/html",
+      md: "text/markdown",
+      zip: "application/zip"
+    };
+
+    return types[extension] || "application/octet-stream";
+  }
+
+  function readLocalFiles(paths) {
+    var list = Array.isArray(paths) ? paths : [paths];
+    var files = [];
+
+    for (var index = 0; index < list.length; index++) {
+      var path = String(list[index]);
+      var data = foundation.NSData.dataWithContentsOfFile(path);
+
+      if (!data) {
+        throw new Error("file_not_found: " + path);
+      }
+
+      var name = path.slice(path.lastIndexOf("/") + 1) || path;
+
+      files.push({
+        name: name,
+        mimeType: mimeTypeForPath(path),
+        base64: data.base64EncodedStringWithOptions(0).js
+      });
+    }
+
+    return files;
+  }
+
   var controlLifecycle = createControlLifecycle({
     show: function (tabId) {
       try {
@@ -1205,6 +1786,10 @@ var run = (function (globalObject) {
 
     if (method === "playwright.locator.waitFor") {
       return waitFor(params);
+    }
+
+    if (method === "playwright.gesture") {
+      return runGesture(params);
     }
 
     if (method.indexOf("playwright.") === 0) {
@@ -1494,6 +2079,25 @@ var run = (function (globalObject) {
     });
   };
 
+  SafariLocator.prototype.canvasSnapshot = function (options) {
+    options = options || {};
+    return this.call("canvasSnapshot", {
+      maxSize: options.maxSize
+    });
+  };
+
+  SafariLocator.prototype.setInputFiles = function (paths) {
+    return this.call("setInputFiles", {
+      files: readLocalFiles(paths)
+    });
+  };
+
+  SafariLocator.prototype.dropFiles = function (paths) {
+    return this.call("dropFiles", {
+      files: readLocalFiles(paths)
+    });
+  };
+
   function SafariPlaywright(tabIdentity) {
     this.tabIdentity = tabIdentity;
   }
@@ -1544,6 +2148,83 @@ var run = (function (globalObject) {
   SafariPlaywright.prototype.domSnapshot = function () {
     return callSafari("playwright.domSnapshot", {
       tabIdentity: this.tabIdentity
+    });
+  };
+
+  SafariPlaywright.prototype.canvasSnapshot = function (
+    selector,
+    options
+  ) {
+    return this.locator(selector).canvasSnapshot(options);
+  };
+
+  SafariPlaywright.prototype.clickAt = function (x, y, options) {
+    options = options || {};
+    var point = { x: Number(x), y: Number(y) };
+    var steps = [
+      { type: "pointermove", x: point.x, y: point.y, buttons: 0 },
+      {
+        type: "pointerdown",
+        x: point.x,
+        y: point.y,
+        button: 0,
+        buttons: 1
+      },
+      {
+        type: "pointerup",
+        x: point.x,
+        y: point.y,
+        button: 0,
+        buttons: 0
+      },
+      { type: "click", x: point.x, y: point.y, button: 0, buttons: 0 }
+    ];
+
+    return callSafari("playwright.gesture", {
+      tabIdentity: this.tabIdentity,
+      steps: steps,
+      delayMs: options.delayMs
+    });
+  };
+
+  SafariPlaywright.prototype.drag = function (
+    fromX,
+    fromY,
+    toX,
+    toY,
+    options
+  ) {
+    options = options || {};
+    var from = { x: Number(fromX), y: Number(fromY) };
+    var to = { x: Number(toX), y: Number(toY) };
+    var count = Number(options.steps) > 0 ? Number(options.steps) : 8;
+    var steps = [
+      { type: "pointermove", x: from.x, y: from.y, buttons: 0 },
+      { type: "pointerdown", x: from.x, y: from.y, button: 0, buttons: 1 }
+    ];
+
+    for (var index = 1; index <= count; index++) {
+      var ratio = index / count;
+      steps.push({
+        type: "pointermove",
+        x: Math.round(from.x + (to.x - from.x) * ratio),
+        y: Math.round(from.y + (to.y - from.y) * ratio),
+        buttons: 1
+      });
+    }
+
+    steps.push({
+      type: "pointerup",
+      x: to.x,
+      y: to.y,
+      button: 0,
+      buttons: 0
+    });
+
+    return callSafari("playwright.gesture", {
+      tabIdentity: this.tabIdentity,
+      steps: steps,
+      delayMs: options.delayMs
     });
   };
 
@@ -1722,8 +2403,63 @@ var run = (function (globalObject) {
     }
   }
 
+  function imageMarker(value) {
+    if (
+      value &&
+      typeof value === "object" &&
+      value.__sbuImage &&
+      typeof value.__sbuImage === "object" &&
+      typeof value.__sbuImage.base64 === "string"
+    ) {
+      return value.__sbuImage;
+    }
+
+    return null;
+  }
+
   function toolResult(result) {
     var lines = result.output.slice();
+    var marker = imageMarker(result.value);
+
+    if (marker) {
+      var summary = {
+        mimeType: marker.mimeType || "image/png",
+        width: marker.width,
+        height: marker.height,
+        bytes: marker.base64.length
+      };
+      var structured = {};
+      var key;
+
+      for (key in result.value) {
+        if (
+          Object.prototype.hasOwnProperty.call(result.value, key) &&
+          key !== "__sbuImage"
+        ) {
+          structured[key] = result.value[key];
+        }
+      }
+
+      structured.image = summary;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: lines.concat([stringify(summary)]).join("\n")
+          },
+          {
+            type: "image",
+            data: marker.base64,
+            mimeType: summary.mimeType
+          }
+        ],
+        structuredContent: {
+          value: jsonValue(structured),
+          output: result.output
+        }
+      };
+    }
 
     if (result.value !== undefined) {
       lines.push(stringify(result.value));
