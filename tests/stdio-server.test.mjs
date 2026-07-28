@@ -140,3 +140,74 @@ test("captures output and resets persistent JXA bindings", async t => {
   assert.equal(afterReset.isError, true);
   assert.match(afterReset.content[0].text, /temporary/);
 });
+
+test("returns the operating guide at runtime over stdio", async t => {
+  const entrypoint = fileURLToPath(new URL(
+    "../plugins/safari-browser-use/dist/server.jxa.js",
+    import.meta.url
+  ));
+  const transport = new StdioClientTransport({
+    command: "/usr/bin/osascript",
+    args: ["-l", "JavaScript", entrypoint],
+    stderr: "pipe"
+  });
+  const client = new Client({
+    name: "safari-browser-use-documentation-test",
+    version: "0.1.0"
+  });
+
+  t.after(async () => {
+    await client.close();
+  });
+
+  await client.connect(transport);
+
+  const instructions = client.getInstructions();
+  assert.match(instructions, /browser\.documentation\(\)/);
+  assert.match(instructions, /untrusted content/i);
+
+  const guide = await client.callTool({
+    name: "js",
+    arguments: {
+      title: "Read the operating guide",
+      code: "browser.documentation()"
+    }
+  });
+
+  const text = guide.structuredContent.value;
+  assert.match(text, /operating guide returned at runtime/);
+  assert.match(text, /Safari Browser Use — Operating Guide/);
+  assert.match(text, /Browser Safety/);
+  assert.match(text, /Snapshot Discipline/);
+
+  const troubleshooting = await client.callTool({
+    name: "js",
+    arguments: {
+      title: "Read the troubleshooting topic",
+      code: "browser.documentation(\"troubleshooting\")"
+    }
+  });
+
+  const troubleshootingText = troubleshooting.structuredContent.value;
+  assert.match(troubleshootingText, /Troubleshooting/);
+  assert.match(troubleshootingText, /Automation Is Unavailable/i);
+  assert.doesNotMatch(
+    troubleshootingText,
+    /Safari Browser Use — Operating Guide/
+  );
+
+  const unknownTopic = await client.callTool({
+    name: "js",
+    arguments: {
+      title: "Request an unknown documentation topic",
+      code: "browser.documentation(\"nope\")"
+    }
+  });
+
+  assert.equal(unknownTopic.isError, true);
+  const unknownText = unknownTopic.content
+    .map((part) => part.text || "")
+    .join("\n");
+  assert.match(unknownText, /Unknown documentation topic/);
+  assert.match(unknownText, /troubleshooting/);
+});

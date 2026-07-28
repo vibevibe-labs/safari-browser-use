@@ -30,6 +30,14 @@ const tabIdentityPath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/tab-identity.mjs"
 );
+const documentationPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/documentation.md"
+);
+const troubleshootingPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/documentation-troubleshooting.md"
+);
 const defaultOutfile = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/dist/server.jxa.js"
@@ -42,14 +50,18 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     safariVersion,
     toolDefinitions,
     controlLifecycle,
-    tabIdentity
+    tabIdentity,
+    documentation,
+    troubleshooting
   ] = await Promise.all([
     readFile(templatePath, "utf8"),
     readFile(pageRuntimePath, "utf8"),
     readFile(safariVersionPath, "utf8"),
     readFile(toolDefinitionsPath, "utf8"),
     readFile(controlLifecyclePath, "utf8"),
-    readFile(tabIdentityPath, "utf8")
+    readFile(tabIdentityPath, "utf8"),
+    readFile(documentationPath, "utf8"),
+    readFile(troubleshootingPath, "utf8")
   ]);
   const withoutExports = source =>
     source.replace(/^export\s+/gm, "");
@@ -73,6 +85,16 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     .replace(
       "/*__SBU_TAB_IDENTITY__*/",
       withoutExports(tabIdentity)
+    )
+    .replace(
+      "/*__SBU_DOCUMENTATION__*/",
+      `var SBU_DOCUMENTATION_TEXT = ${JSON.stringify(documentation)};`
+    )
+    .replace(
+      "/*__SBU_DOCUMENTATION_TROUBLESHOOTING__*/",
+      `var SBU_DOCUMENTATION_TROUBLESHOOTING_TEXT = ${
+        JSON.stringify(troubleshooting)
+      };`
     );
 
   await writeFile(outfile, output);
