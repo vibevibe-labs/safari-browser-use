@@ -24,6 +24,10 @@ export function runPageOperation(
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
+  const highlightAttribute =
+    "data-safari-browser-use-highlight";
+  const highlightStyleId =
+    "__safari_browser_use_highlight_style__";
 
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
@@ -140,6 +144,174 @@ export function runPageOperation(
       requestedLeaseMs > 0
       ? Math.min(requestedLeaseMs, 300_000)
       : 45_000;
+  }
+
+  function controlCursorElement() {
+    return document.querySelector(`[${controlCursorAttribute}]`);
+  }
+
+  function prefersReducedMotion() {
+    return (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  function moveControlCursorTo(point, options = {}) {
+    if (
+      !point ||
+      !Number.isFinite(point.x) ||
+      !Number.isFinite(point.y)
+    ) {
+      return { moved: false };
+    }
+
+    showControlIndicator(options);
+
+    const cursor = controlCursorElement();
+
+    if (!cursor) {
+      return { moved: false };
+    }
+
+    const glideMs = Number.isFinite(Number(options.glideMs))
+      ? Number(options.glideMs)
+      : 320;
+
+    cursor.style.right = "auto";
+    cursor.style.bottom = "auto";
+    cursor.style.transition = prefersReducedMotion()
+      ? "none"
+      : `left ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1), ` +
+        `top ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    cursor.style.left = `${point.x - 3}px`;
+    cursor.style.top = `${point.y - 2}px`;
+
+    return { moved: true, x: point.x, y: point.y };
+  }
+
+  function pointerablePoint(element) {
+    if (
+      !element ||
+      typeof element.getBoundingClientRect !== "function"
+    ) {
+      return null;
+    }
+
+    const rect = element.getBoundingClientRect();
+
+    if (!rect || (!rect.width && !rect.height)) {
+      return null;
+    }
+
+    // Aim near the centre with a small imprecise offset so the
+    // cursor lands naturally rather than pixel-perfectly.
+    const jitterX = (Math.random() - 0.5) * Math.min(rect.width, 24);
+    const jitterY = (Math.random() - 0.5) * Math.min(rect.height, 16);
+    const viewportWidth = window.innerWidth || rect.right;
+    const viewportHeight = window.innerHeight || rect.bottom;
+    const x = Math.max(
+      2,
+      Math.min(rect.left + rect.width / 2 + jitterX, viewportWidth - 2)
+    );
+    const y = Math.max(
+      2,
+      Math.min(rect.top + rect.height / 2 + jitterY, viewportHeight - 2)
+    );
+
+    return { x, y };
+  }
+
+  function moveControlCursorToElement(element, options) {
+    try {
+      return moveControlCursorTo(pointerablePoint(element), options);
+    } catch (error) {
+      // The cursor illusion must never break a real operation.
+      return { moved: false };
+    }
+  }
+
+  function ensureHighlightStyle() {
+    if (document.getElementById(highlightStyleId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = highlightStyleId;
+    style.textContent = `
+      @keyframes __safari_browser_use_highlight_fade__ {
+        0% { opacity: 1; transform: scale(1.03); }
+        5% { opacity: 1; transform: scale(1); }
+        25% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1); }
+      }
+
+      [${highlightAttribute}] {
+        animation:
+          __safari_browser_use_highlight_fade__
+          3000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${highlightAttribute}] {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).append(style);
+  }
+
+  function highlightElement(element) {
+    try {
+      const rect =
+        element && typeof element.getBoundingClientRect === "function"
+          ? element.getBoundingClientRect()
+          : null;
+
+      if (!rect || (!rect.width && !rect.height)) {
+        return { highlighted: false };
+      }
+
+      ensureHighlightStyle();
+
+      const pad = 4;
+      const glow = document.createElement("div");
+      glow.setAttribute(highlightAttribute, "");
+      glow.setAttribute("aria-hidden", "true");
+      Object.assign(glow.style, {
+        position: "fixed",
+        left: `${rect.left - pad}px`,
+        top: `${rect.top - pad}px`,
+        width: `${rect.width + pad * 2}px`,
+        height: `${rect.height + pad * 2}px`,
+        boxSizing: "border-box",
+        pointerEvents: "none",
+        zIndex: "2147483646",
+        borderRadius: "10px",
+        border: "2px solid rgba(255, 148, 0, 0.95)",
+        backgroundColor: "rgba(255, 152, 32, 0.12)",
+        boxShadow: [
+          "0 0 0 3px rgba(255, 165, 40, 0.55)",
+          "0 0 16px 4px rgba(255, 140, 0, 0.80)",
+          "0 0 38px 12px rgba(255, 120, 0, 0.45)"
+        ].join(", "),
+        willChange: "opacity, transform"
+      });
+
+      const remove = () => glow.remove();
+      glow.addEventListener("animationend", remove);
+      // Fallback removal in case the animation event never fires.
+      window.setTimeout(remove, 3200);
+
+      document.documentElement.append(glow);
+
+      return { highlighted: true };
+    } catch (error) {
+      // The highlight is decorative and must never break an operation.
+      return { highlighted: false };
+    }
   }
 
   function normalizeText(value) {
@@ -574,6 +746,14 @@ export function runPageOperation(
       document.documentElement ||
       document.body;
 
+    // Glide the fake cursor along the coordinate path so a person
+    // watching sees the pointer travel to where the AI is acting.
+    try {
+      moveControlCursorTo({ x, y }, { glideMs: 90 });
+    } catch (error) {
+      // never let the illusion break a real gesture
+    }
+
     const base = {
       bubbles: true,
       cancelable: true,
@@ -764,12 +944,34 @@ export function runPageOperation(
 
   const element = oneLocatorElement(params.locator);
 
+  const pointerOperations = new Set([
+    "click",
+    "fill",
+    "type",
+    "press",
+    "check",
+    "uncheck",
+    "setChecked",
+    "selectOption",
+    "setInputFiles",
+    "dropFiles"
+  ]);
+
+  if (pointerOperations.has(operation)) {
+    moveControlCursorToElement(element, params);
+    if (operation !== "click") {
+      highlightElement(element);
+    }
+  }
+
   switch (operation) {
     case "click":
       element.scrollIntoView?.({
         block: "center",
         inline: "center"
       });
+      moveControlCursorToElement(element, params);
+      highlightElement(element);
       element.click();
       return { clicked: true };
     case "canvasSnapshot":

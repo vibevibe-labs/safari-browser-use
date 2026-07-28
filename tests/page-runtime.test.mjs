@@ -872,3 +872,188 @@ test("delivers dropped files to a drop zone handler", () => {
   assert.equal(result.via, "drop");
   assert.deepEqual(dropped, [{ name: "photo.png", size: 5 }]);
 });
+
+test("glides the fake cursor to a clicked element", () => {
+  const { execute, window } = createPage(
+    `<button id="go">Continue</button>`
+  );
+  const button = window.document.querySelector("#go");
+  button.getBoundingClientRect = () => ({
+    left: 200,
+    top: 120,
+    width: 100,
+    height: 40,
+    right: 300,
+    bottom: 160
+  });
+
+  execute("playwright.locator.click", {
+    locator: [{ type: "css", selector: "#go" }]
+  });
+
+  const cursor = window.document.querySelector(
+    "[data-safari-browser-use-control-cursor]"
+  );
+
+  assert.notEqual(cursor, null);
+  // The cursor left its parked corner and now sits over the element.
+  assert.equal(cursor.style.right, "auto");
+  assert.equal(cursor.style.bottom, "auto");
+  const left = parseFloat(cursor.style.left);
+  const top = parseFloat(cursor.style.top);
+  assert.ok(left >= 200 && left <= 300, `left ${left} within element`);
+  assert.ok(top >= 120 && top <= 160, `top ${top} within element`);
+});
+
+test("glides the fake cursor along a coordinate gesture", () => {
+  const { execute, window } = createPage(
+    `<canvas id="stage" width="300" height="150"></canvas>`
+  );
+  const canvas = window.document.querySelector("#stage");
+  window.document.elementFromPoint = () => canvas;
+
+  execute("playwright.mouseEvent", {
+    type: "pointermove",
+    x: 64,
+    y: 48,
+    buttons: 1
+  });
+
+  const cursor = window.document.querySelector(
+    "[data-safari-browser-use-control-cursor]"
+  );
+
+  assert.notEqual(cursor, null);
+  assert.equal(cursor.style.right, "auto");
+  assert.equal(parseFloat(cursor.style.left), 64 - 3);
+  assert.equal(parseFloat(cursor.style.top), 48 - 2);
+});
+
+test("does not summon the cursor for read-only reads", () => {
+  const { execute, window } = createPage(
+    `<p id="copy">Hello</p>`
+  );
+
+  execute("playwright.locator.innerText", {
+    locator: [{ type: "css", selector: "#copy" }]
+  });
+
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-control-cursor]"
+    ),
+    null
+  );
+});
+
+test("wraps a clicked element in a fading orange highlight", () => {
+  const { execute, window } = createPage(
+    `<button id="go">Continue</button>`
+  );
+  const button = window.document.querySelector("#go");
+  button.getBoundingClientRect = () => ({
+    left: 200,
+    top: 120,
+    width: 100,
+    height: 40,
+    right: 300,
+    bottom: 160
+  });
+
+  execute("playwright.locator.click", {
+    locator: [{ type: "css", selector: "#go" }]
+  });
+
+  const glow = window.document.querySelector(
+    "[data-safari-browser-use-highlight]"
+  );
+
+  assert.notEqual(glow, null);
+  assert.equal(glow.style.position, "fixed");
+  assert.equal(glow.style.pointerEvents, "none");
+  assert.equal(glow.getAttribute("aria-hidden"), "true");
+  // Positioned over the element (with a small padding).
+  assert.equal(parseFloat(glow.style.left), 200 - 4);
+  assert.equal(parseFloat(glow.style.top), 120 - 4);
+  assert.equal(parseFloat(glow.style.width), 100 + 8);
+  assert.equal(parseFloat(glow.style.height), 40 + 8);
+  // Orange glow.
+  assert.match(glow.style.boxShadow, /255,\s*(1[234]0|165)/);
+  // A single fade stylesheet is injected.
+  assert.notEqual(
+    window.document.getElementById(
+      "__safari_browser_use_highlight_style__"
+    ),
+    null
+  );
+});
+
+test("highlights inputs, checkboxes and selects on interaction", () => {
+  const cases = [
+    {
+      html: `<input id="t" type="text">`,
+      method: "playwright.locator.fill",
+      params: { value: "hi" }
+    },
+    {
+      html: `<input id="t" type="checkbox">`,
+      method: "playwright.locator.setChecked",
+      params: { checked: true }
+    },
+    {
+      html: `<select id="t"><option value="a">A</option></select>`,
+      method: "playwright.locator.selectOption",
+      params: { values: ["a"] }
+    }
+  ];
+
+  for (const testCase of cases) {
+    const { execute, window } = createPage(testCase.html);
+    const target = window.document.querySelector("#t");
+    target.getBoundingClientRect = () => ({
+      left: 10,
+      top: 10,
+      width: 120,
+      height: 30,
+      right: 130,
+      bottom: 40
+    });
+
+    execute(testCase.method, {
+      locator: [{ type: "css", selector: "#t" }],
+      ...testCase.params
+    });
+
+    assert.notEqual(
+      window.document.querySelector(
+        "[data-safari-browser-use-highlight]"
+      ),
+      null,
+      `expected highlight for ${testCase.method}`
+    );
+  }
+});
+
+test("does not highlight read-only reads", () => {
+  const { execute, window } = createPage(`<p id="copy">Hello</p>`);
+  const target = window.document.querySelector("#copy");
+  target.getBoundingClientRect = () => ({
+    left: 10,
+    top: 10,
+    width: 100,
+    height: 20,
+    right: 110,
+    bottom: 30
+  });
+
+  execute("playwright.locator.innerText", {
+    locator: [{ type: "css", selector: "#copy" }]
+  });
+
+  assert.equal(
+    window.document.querySelector(
+      "[data-safari-browser-use-highlight]"
+    ),
+    null
+  );
+});
