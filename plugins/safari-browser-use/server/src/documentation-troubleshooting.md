@@ -34,7 +34,7 @@ instead of keyboard focus traversal.
 
 Call `browser.release()` to remove the active tab's perimeter glow and fake
 cursor. `js_reset` also releases it. If the MCP process ended unexpectedly, the
-indicator removes itself after 45 seconds without browser activity.
+indicator removes itself after 60 seconds without browser activity.
 
 ## REPL Binding Conflicts
 

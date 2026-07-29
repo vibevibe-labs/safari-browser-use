@@ -24,10 +24,20 @@ export function runPageOperation(
     "__safari_browser_use_control_style__";
   const controlTimerKey =
     "__safari_browser_use_control_timer__";
+  const documentIdKey =
+    "__safari_browser_use_document_id__";
   const highlightAttribute =
     "data-safari-browser-use-highlight";
   const highlightStyleId =
     "__safari_browser_use_highlight_style__";
+  const gestureHighlightAttribute =
+    "data-safari-browser-use-gesture-highlight";
+  const gestureHighlightStyleId =
+    "__safari_browser_use_gesture_highlight_style__";
+  const gesturePathAttribute =
+    "data-safari-browser-use-gesture-path";
+  const gesturePointAttribute =
+    "data-safari-browser-use-gesture-point";
 
   function hideControlIndicator() {
     window.clearTimeout(window[controlTimerKey]);
@@ -143,7 +153,74 @@ export function runPageOperation(
     return Number.isFinite(requestedLeaseMs) &&
       requestedLeaseMs > 0
       ? Math.min(requestedLeaseMs, 300_000)
-      : 45_000;
+      : 60_000;
+  }
+
+  function pageDocumentId() {
+    if (!window[documentIdKey]) {
+      window[documentIdKey] =
+        `document-${Date.now().toString(36)}-` +
+        Math.random().toString(36).slice(2);
+    }
+
+    return window[documentIdKey];
+  }
+
+  function expectsDocumentNavigation(element) {
+    const anchor = element.closest?.("a[href]");
+
+    if (anchor) {
+      const target =
+        (anchor.getAttribute("target") || "_self").toLowerCase();
+
+      if (
+        anchor.hasAttribute("download") ||
+        (target !== "_self" && target !== "")
+      ) {
+        return false;
+      }
+
+      try {
+        const current = new URL(window.location.href);
+        const destination = new URL(anchor.href, current);
+        const withoutHash = value =>
+          `${value.origin}${value.pathname}${value.search}`;
+
+        return (
+          (destination.protocol === "http:" ||
+            destination.protocol === "https:") &&
+          (
+            destination.href === current.href ||
+            withoutHash(destination) !== withoutHash(current)
+          )
+        );
+      } catch (error) {
+        return false;
+      }
+    }
+
+    const form = element.form;
+
+    if (!form) {
+      return false;
+    }
+
+    const target =
+      (form.getAttribute("target") || "_self").toLowerCase();
+    const tagName = element.tagName.toLowerCase();
+    const type = (
+      element.getAttribute("type") ||
+      (tagName === "button" ? "submit" : "")
+    ).toLowerCase();
+
+    return (
+      (target === "_self" || target === "") &&
+      (
+        tagName === "button" && type === "submit" ||
+        tagName === "input" &&
+          (type === "submit" || type === "image")
+      )
+    );
   }
 
   function controlCursorElement() {
@@ -180,12 +257,15 @@ export function runPageOperation(
 
     cursor.style.right = "auto";
     cursor.style.bottom = "auto";
+    cursor.style.left = "0";
+    cursor.style.top = "0";
     cursor.style.transition = prefersReducedMotion()
       ? "none"
-      : `left ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1), ` +
-        `top ${glideMs}ms cubic-bezier(0.22, 1, 0.36, 1)`;
-    cursor.style.left = `${point.x - 3}px`;
-    cursor.style.top = `${point.y - 2}px`;
+      : `transform ${glideMs}ms ` +
+        "cubic-bezier(0.22, 1, 0.36, 1)";
+    cursor.style.transform =
+      `translate3d(${point.x - 3}px, ${point.y - 2}px, 0px)`;
+    cursor.style.willChange = "transform";
 
     return { moved: true, x: point.x, y: point.y };
   }
@@ -249,7 +329,7 @@ export function runPageOperation(
       [${highlightAttribute}] {
         animation:
           __safari_browser_use_highlight_fade__
-          3000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          4000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -303,13 +383,153 @@ export function runPageOperation(
       const remove = () => glow.remove();
       glow.addEventListener("animationend", remove);
       // Fallback removal in case the animation event never fires.
-      window.setTimeout(remove, 3200);
+      window.setTimeout(remove, 4200);
 
       document.documentElement.append(glow);
 
       return { highlighted: true };
     } catch (error) {
       // The highlight is decorative and must never break an operation.
+      return { highlighted: false };
+    }
+  }
+
+  function ensureGestureHighlightStyle() {
+    if (document.getElementById(gestureHighlightStyleId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = gestureHighlightStyleId;
+    style.textContent = `
+      @keyframes __safari_browser_use_gesture_highlight_fade__ {
+        0%, 25% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+
+      [${gestureHighlightAttribute}] {
+        animation:
+          __safari_browser_use_gesture_highlight_fade__
+          4000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${gestureHighlightAttribute}] {
+          animation: none !important;
+          opacity: 1 !important;
+        }
+      }
+    `;
+    (document.head || document.documentElement).append(style);
+  }
+
+  function highlightGesture(params) {
+    try {
+      const kind = String(params.kind);
+      const glow = document.createElement("div");
+      glow.setAttribute(gestureHighlightAttribute, kind);
+      glow.setAttribute("aria-hidden", "true");
+      Object.assign(glow.style, {
+        position: "fixed",
+        pointerEvents: "none",
+        zIndex: "2147483646",
+        boxSizing: "border-box"
+      });
+
+      ensureGestureHighlightStyle();
+
+      if (kind === "click") {
+        const x = Number(params.x);
+        const y = Number(params.y);
+        const diameter = 36;
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return { highlighted: false };
+        }
+
+        Object.assign(glow.style, {
+          left: `${x - diameter / 2}px`,
+          top: `${y - diameter / 2}px`,
+          width: `${diameter}px`,
+          height: `${diameter}px`,
+          borderRadius: "50%",
+          border: "3px solid rgba(255, 148, 0, 0.98)",
+          backgroundColor: "rgba(255, 152, 32, 0.18)",
+          boxShadow: [
+            "0 0 0 5px rgba(255, 165, 40, 0.42)",
+            "0 0 22px 8px rgba(255, 120, 0, 0.72)"
+          ].join(", ")
+        });
+      } else if (kind === "drag") {
+        const fromX = Number(params.fromX);
+        const fromY = Number(params.fromY);
+        const toX = Number(params.toX);
+        const toY = Number(params.toY);
+
+        if (
+          !Number.isFinite(fromX) ||
+          !Number.isFinite(fromY) ||
+          !Number.isFinite(toX) ||
+          !Number.isFinite(toY)
+        ) {
+          return { highlighted: false };
+        }
+
+        const deltaX = toX - fromX;
+        const deltaY = toY - fromY;
+        const path = document.createElement("div");
+        path.setAttribute(gesturePathAttribute, "");
+        Object.assign(path.style, {
+          position: "absolute",
+          left: `${fromX}px`,
+          top: `${fromY}px`,
+          width: `${Math.hypot(deltaX, deltaY)}px`,
+          height: "0",
+          borderTop: "3px solid rgba(255, 148, 0, 0.95)",
+          boxShadow: "0 0 14px 4px rgba(255, 120, 0, 0.68)",
+          transformOrigin: "0 50%",
+          transform:
+            `rotate(${Math.atan2(deltaY, deltaX) * 180 / Math.PI}deg)`
+        });
+        glow.append(path);
+
+        [
+          ["start", fromX, fromY],
+          ["end", toX, toY]
+        ].forEach(([name, x, y]) => {
+          const point = document.createElement("div");
+          point.setAttribute(gesturePointAttribute, name);
+          Object.assign(point.style, {
+            position: "absolute",
+            left: `${x - 9}px`,
+            top: `${y - 9}px`,
+            width: "18px",
+            height: "18px",
+            borderRadius: "50%",
+            border: "3px solid rgba(255, 148, 0, 0.98)",
+            backgroundColor: name === "end"
+              ? "rgba(255, 132, 0, 0.82)"
+              : "rgba(255, 245, 210, 0.94)",
+            boxShadow: "0 0 16px 5px rgba(255, 120, 0, 0.68)"
+          });
+          glow.append(point);
+        });
+
+        Object.assign(glow.style, {
+          inset: "0"
+        });
+      } else {
+        return { highlighted: false };
+      }
+
+      const remove = () => glow.remove();
+      glow.addEventListener("animationend", remove);
+      window.setTimeout(remove, 4200);
+      document.documentElement.append(glow);
+
+      return { highlighted: true };
+    } catch (error) {
+      // Gesture highlighting must never break a real operation.
       return { highlighted: false };
     }
   }
@@ -856,6 +1076,10 @@ export function runPageOperation(
 
   if (method === "playwright.pageState") {
     return {
+      controlVisible: Boolean(document.querySelector(
+        `[${controlIndicatorAttribute}]`
+      )),
+      documentId: pageDocumentId(),
       readyState: document.readyState,
       url: window.location.href
     };
@@ -895,6 +1119,10 @@ export function runPageOperation(
 
   if (method === "playwright.mouseEvent") {
     return dispatchMouseEvent(params);
+  }
+
+  if (method === "playwright.gestureHighlight") {
+    return highlightGesture(params);
   }
 
   if (method === "control.show") {
@@ -986,6 +1214,8 @@ export function runPageOperation(
 
   switch (operation) {
     case "click":
+      const navigationExpected =
+        expectsDocumentNavigation(element);
       element.scrollIntoView?.({
         block: "center",
         inline: "center"
@@ -993,7 +1223,7 @@ export function runPageOperation(
       moveControlCursorToElement(element, params);
       highlightElement(element);
       element.click();
-      return { clicked: true };
+      return { clicked: true, navigationExpected };
     case "canvasSnapshot":
       return canvasSnapshot(element, params);
     case "setInputFiles": {

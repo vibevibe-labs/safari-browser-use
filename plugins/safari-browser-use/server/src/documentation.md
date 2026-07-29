@@ -82,6 +82,10 @@ Selecting or operating a tab adds a non-interactive perimeter glow and a visible
 fake cursor to the controlled page. They start, refresh, and stop together as
 one control indicator.
 
+When a navigation-capable operation replaces the page document, the same browser
+call waits for the new document and restores the control indicator before it
+returns. URL and load-state waits also verify that the indicator is visible.
+
 Always release control before the final response, including when the task
 finishes early:
 
@@ -89,7 +93,7 @@ finishes early:
 browser.release()
 ```
 
-`js_reset` and MCP shutdown also release control, and a 45-second inactivity
+`js_reset` and MCP shutdown also release control, and a 60-second inactivity
 lease removes a stale indicator if the session ends unexpectedly.
 
 Do not close tabs by default. Only close a tab you created for this task and no
