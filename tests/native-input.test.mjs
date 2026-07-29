@@ -135,6 +135,181 @@ test("focuses the target tab before posting one native click", async () => {
   ]);
 });
 
+test("pastes rich content with a native shortcut and restores the clipboard", async () => {
+  const { createNativeInput } = await import(nativeInputModule);
+  const calls = [];
+  const nativeInput = createNativeInput({
+    focus(tabId) {
+      calls.push(["focus", tabId]);
+    },
+    readViewport() {
+      return viewport;
+    },
+    readWindowBounds() {
+      return windowBounds;
+    },
+    postClick() {},
+    saveClipboard() {
+      calls.push(["saveClipboard"]);
+      return { items: ["saved"] };
+    },
+    writeClipboard(content) {
+      calls.push(["writeClipboard", content]);
+    },
+    readClipboard() {
+      return { text: "copied", html: "<b>copied</b>" };
+    },
+    restoreClipboard(saved) {
+      calls.push(["restoreClipboard", saved]);
+    },
+    postShortcut(key, modifiers) {
+      calls.push(["shortcut", key, modifiers]);
+    },
+    sleep(milliseconds) {
+      calls.push(["sleep", milliseconds]);
+    }
+  });
+
+  assert.deepEqual(
+    nativeInput.paste(
+      "71009:19",
+      { text: "Hello", html: "<b>Hello</b>" }
+    ),
+    { pasted: true }
+  );
+  assert.deepEqual(calls, [
+    ["focus", "71009:19"],
+    ["saveClipboard"],
+    [
+      "writeClipboard",
+      { text: "Hello", html: "<b>Hello</b>" }
+    ],
+    ["shortcut", "v", ["command"]],
+    ["sleep", 150],
+    ["restoreClipboard", { items: ["saved"] }]
+  ]);
+});
+
+test("copies a native selection without leaving user clipboard changes", async () => {
+  const { createNativeInput } = await import(nativeInputModule);
+  const calls = [];
+  const nativeInput = createNativeInput({
+    focus(tabId) {
+      calls.push(["focus", tabId]);
+    },
+    readViewport() {
+      return viewport;
+    },
+    readWindowBounds() {
+      return windowBounds;
+    },
+    postClick() {},
+    saveClipboard() {
+      calls.push(["saveClipboard"]);
+      return "saved";
+    },
+    writeClipboard() {},
+    readClipboard() {
+      calls.push(["readClipboard"]);
+      return { text: "A\tB", html: "<table></table>" };
+    },
+    restoreClipboard(saved) {
+      calls.push(["restoreClipboard", saved]);
+    },
+    postShortcut(key, modifiers) {
+      calls.push(["shortcut", key, modifiers]);
+    },
+    sleep(milliseconds) {
+      calls.push(["sleep", milliseconds]);
+    }
+  });
+
+  assert.deepEqual(
+    nativeInput.copy("71009:19"),
+    { text: "A\tB", html: "<table></table>" }
+  );
+  assert.deepEqual(calls, [
+    ["focus", "71009:19"],
+    ["saveClipboard"],
+    ["shortcut", "c", ["command"]],
+    ["sleep", 150],
+    ["readClipboard"],
+    ["restoreClipboard", "saved"]
+  ]);
+});
+
+test("restores the clipboard when a native paste fails", async () => {
+  const { createNativeInput } = await import(nativeInputModule);
+  const restored = [];
+  const nativeInput = createNativeInput({
+    focus() {},
+    readViewport() {
+      return viewport;
+    },
+    readWindowBounds() {
+      return windowBounds;
+    },
+    postClick() {},
+    saveClipboard() {
+      return "saved";
+    },
+    writeClipboard() {},
+    readClipboard() {
+      return {};
+    },
+    restoreClipboard(saved) {
+      restored.push(saved);
+    },
+    postShortcut() {
+      throw new Error("native keyboard denied");
+    },
+    sleep() {}
+  });
+
+  assert.throws(
+    () => nativeInput.paste("71009:19", { text: "Hello" }),
+    /native keyboard denied/
+  );
+  assert.deepEqual(restored, ["saved"]);
+});
+
+test("posts a trusted keyboard shortcut after focusing its tab", async () => {
+  const { createNativeInput } = await import(nativeInputModule);
+  const calls = [];
+  const nativeInput = createNativeInput({
+    focus(tabId) {
+      calls.push(["focus", tabId]);
+    },
+    readViewport() {
+      return viewport;
+    },
+    readWindowBounds() {
+      return windowBounds;
+    },
+    postClick() {},
+    saveClipboard() {},
+    writeClipboard() {},
+    readClipboard() {},
+    restoreClipboard() {},
+    postShortcut(key, modifiers) {
+      calls.push(["shortcut", key, modifiers]);
+    },
+    sleep(milliseconds) {
+      calls.push(["sleep", milliseconds]);
+    }
+  });
+
+  assert.deepEqual(
+    nativeInput.shortcut("71009:19", "a", ["command", "shift"]),
+    { pressed: true }
+  );
+  assert.deepEqual(calls, [
+    ["focus", "71009:19"],
+    ["shortcut", "a", ["command", "shift"]],
+    ["sleep", 75]
+  ]);
+});
+
 test("build exposes nativeClickAt without changing clickAt", async t => {
   const directory = await mkdtemp(
     join(tmpdir(), "safari-browser-use-native-input-")

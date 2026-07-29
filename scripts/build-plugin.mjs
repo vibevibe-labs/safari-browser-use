@@ -26,6 +26,22 @@ const nativeInputPath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/native-input.mjs"
 );
+const googleAccountsPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/google-accounts.mjs"
+);
+const googleDocsPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/google-docs.mjs"
+);
+const googleSheetsPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/google-sheets.mjs"
+);
+const googleWorkspaceEditorPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/google-workspace-editor.mjs"
+);
 const controlLifecyclePath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/control-lifecycle.mjs"
@@ -54,6 +70,10 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     safariVersion,
     toolDefinitions,
     nativeInput,
+    googleAccounts,
+    googleDocs,
+    googleSheets,
+    googleWorkspaceEditor,
     controlLifecycle,
     tabIdentity,
     documentation,
@@ -64,6 +84,10 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     readFile(safariVersionPath, "utf8"),
     readFile(toolDefinitionsPath, "utf8"),
     readFile(nativeInputPath, "utf8"),
+    readFile(googleAccountsPath, "utf8"),
+    readFile(googleDocsPath, "utf8"),
+    readFile(googleSheetsPath, "utf8"),
+    readFile(googleWorkspaceEditorPath, "utf8"),
     readFile(controlLifecyclePath, "utf8"),
     readFile(tabIdentityPath, "utf8"),
     readFile(documentationPath, "utf8"),
@@ -87,6 +111,22 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     .replace(
       "/*__SBU_NATIVE_INPUT__*/",
       withoutExports(nativeInput)
+    )
+    .replace(
+      "/*__SBU_GOOGLE_ACCOUNTS__*/",
+      withoutExports(googleAccounts)
+    )
+    .replace(
+      "/*__SBU_GOOGLE_DOCS__*/",
+      withoutExports(googleDocs)
+    )
+    .replace(
+      "/*__SBU_GOOGLE_SHEETS__*/",
+      withoutExports(googleSheets)
+    )
+    .replace(
+      "/*__SBU_GOOGLE_WORKSPACE_EDITOR__*/",
+      withoutExports(googleWorkspaceEditor)
     )
     .replace(
       "/*__SBU_CONTROL_LIFECYCLE__*/",

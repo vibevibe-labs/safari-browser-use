@@ -1066,6 +1066,128 @@ export function runPageOperation(
     }
   }
 
+  function firstElement(selectors) {
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+
+      if (element) {
+        return element;
+      }
+    }
+
+    return null;
+  }
+
+  function centrePoint(element) {
+    if (!element || typeof element.getBoundingClientRect !== "function") {
+      return null;
+    }
+
+    const rect = element.getBoundingClientRect();
+
+    if (
+      !rect ||
+      !Number.isFinite(Number(rect.width)) ||
+      !Number.isFinite(Number(rect.height)) ||
+      Number(rect.width) <= 0 ||
+      Number(rect.height) <= 0
+    ) {
+      return null;
+    }
+
+    return {
+      x: Math.round(Number(rect.left) + Number(rect.width) / 2),
+      y: Math.round(Number(rect.top) + Number(rect.height) / 2)
+    };
+  }
+
+  function controlValue(element) {
+    if (!element) {
+      return "";
+    }
+
+    if ("value" in element) {
+      return String(element.value ?? "");
+    }
+
+    const input = element.querySelector?.("input");
+
+    return input && "value" in input
+      ? String(input.value ?? "")
+      : String(element.textContent ?? "").trim();
+  }
+
+  function googleDocsEditorState() {
+    const title = firstElement([
+      ".docs-title-input",
+      "[aria-label='Document title']"
+    ]);
+    const editor = firstElement([
+      ".kix-appview-editor",
+      ".kix-page-paginated",
+      ".kix-page"
+    ]);
+
+    return {
+      title: controlValue(title),
+      editorPoint: centrePoint(editor)
+    };
+  }
+
+  function googleSheetsEditorState() {
+    const title = firstElement([
+      ".docs-title-input",
+      "[aria-label='Spreadsheet title']"
+    ]);
+    const nameBox = firstElement([
+      ".waffle-name-box",
+      "#t-name-box",
+      "[aria-label='Name box']"
+    ]);
+    const grid = firstElement([
+      ".waffle-grid-container",
+      "#waffle-grid-container",
+      "canvas",
+      ".grid-container"
+    ]);
+    const tabs = [
+      ...document.querySelectorAll(
+        ".docs-sheet-tab[data-sheet-id], " +
+        ".docs-sheet-tab[data-id]"
+      )
+    ];
+
+    return {
+      title: controlValue(title),
+      selectionRange: controlValue(nameBox),
+      nameBoxPoint: centrePoint(nameBox),
+      sheets: tabs.map(tab => {
+        const gid =
+          tab.getAttribute("data-sheet-id") ||
+          tab.getAttribute("data-id") ||
+          "";
+        const name = tab.querySelector(".docs-sheet-tab-name");
+
+        return {
+          name: String(
+            name ? name.textContent : tab.textContent
+          ).trim(),
+          gid: String(gid),
+          gridId: String(gid)
+        };
+      }),
+      editorPoint: centrePoint(grid)
+    };
+  }
+
+  if (method === "googleDocs.editorState") {
+    return googleDocsEditorState();
+  }
+
+  if (method === "googleSheets.editorState") {
+    return googleSheetsEditorState();
+  }
+
   if (method === "playwright.domSnapshot") {
     return domSnapshot();
   }

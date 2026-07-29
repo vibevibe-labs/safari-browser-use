@@ -51,6 +51,16 @@ When the page presents a CAPTCHA or another human-verification challenge, read
 [the CAPTCHA reference](references/captcha.md) before
 interacting with it.
 
+When working with a Google app or a "Sign in with Google" account chooser, and
+the account identity can affect the operation, read
+[the Google Accounts reference](references/google-accounts.md) before choosing
+an account or using an account-specific URL.
+
+For a Google Docs task, also read
+[the Google Docs reference](references/google-docs.md). For a Google Sheets
+task, also read
+[the Google Sheets reference](references/google-sheets.md).
+
 Bindings declared with `var` persist across cells until `js_reset` is called;
 `const` and `let` are local to one cell. Define `tab` once and keep using it.
 

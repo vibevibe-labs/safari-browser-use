@@ -26,6 +26,98 @@ function createPage(html) {
   };
 }
 
+test("inspects the Google Docs title and native editor point", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Project note">
+    <div class="kix-appview-editor"></div>
+  `);
+  const editor = window.document.querySelector(
+    ".kix-appview-editor"
+  );
+  editor.getBoundingClientRect = () => ({
+    left: 100,
+    top: 200,
+    width: 600,
+    height: 800,
+    right: 700,
+    bottom: 1000
+  });
+
+  assert.deepEqual(execute("googleDocs.editorState"), {
+    title: "Project note",
+    editorPoint: { x: 400, y: 600 }
+  });
+});
+
+test("inspects Google Sheets tabs, selection, and native grid point", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Budget">
+    <input class="waffle-name-box" value="B5">
+    <div class="docs-sheet-tab" data-sheet-id="0">
+      <span class="docs-sheet-tab-name">Summary</span>
+    </div>
+    <div class="docs-sheet-tab" data-sheet-id="42">
+      <span class="docs-sheet-tab-name">Archive</span>
+    </div>
+    <div class="waffle-grid-container"></div>
+  `);
+  const grid = window.document.querySelector(
+    ".waffle-grid-container"
+  );
+  const nameBox = window.document.querySelector(
+    ".waffle-name-box"
+  );
+  nameBox.getBoundingClientRect = () => ({
+    left: 10,
+    top: 80,
+    width: 120,
+    height: 30,
+    right: 130,
+    bottom: 110
+  });
+  grid.getBoundingClientRect = () => ({
+    left: 50,
+    top: 150,
+    width: 900,
+    height: 600,
+    right: 950,
+    bottom: 750
+  });
+
+  assert.deepEqual(execute("googleSheets.editorState"), {
+    title: "Budget",
+    selectionRange: "B5",
+    nameBoxPoint: { x: 70, y: 95 },
+    sheets: [
+      { name: "Summary", gid: "0", gridId: "0" },
+      { name: "Archive", gid: "42", gridId: "42" }
+    ],
+    editorPoint: { x: 500, y: 450 }
+  });
+});
+
+test("uses the Sheets canvas when the generic grid wrapper has no size", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Budget">
+    <div class="grid-container"></div>
+    <canvas></canvas>
+  `);
+  const canvas = window.document.querySelector("canvas");
+  canvas.getBoundingClientRect = () => ({
+    left: 40,
+    top: 120,
+    width: 800,
+    height: 500,
+    right: 840,
+    bottom: 620
+  });
+
+  assert.deepEqual(
+    execute("googleSheets.editorState").editorPoint,
+    { x: 440, y: 370 }
+  );
+});
+
 test("returns a Playwright-style DOM snapshot", () => {
   const { execute } = createPage(`
     <label for="email">Email address</label>

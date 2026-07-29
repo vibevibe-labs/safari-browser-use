@@ -6,11 +6,12 @@ full before browser work and follow it; do not rely on remembered guidance from
 an earlier version.
 
 Every action runs through the `js` MCP tool as one synchronous JavaScript cell
-against the injected `browser` object, over Safari's Apple Events interface.
-Bindings declared with `var` persist across cells until `js_reset`; `const` and
-`let` are local to one cell. Define `tab` once and keep using it. Re-query a tab
-only when you intentionally switch tabs, after `js_reset`, or after a failed cell
-that never created the binding.
+against the injected `browser`, `googleAccounts`, `googleDocs`, and
+`googleSheets` objects, over Safari's Apple Events interface. Bindings declared
+with `var` persist across cells until `js_reset`; `const` and `let` are local to
+one cell. Define `tab` once and keep using it. Re-query a tab only when you
+intentionally switch tabs, after `js_reset`, or after a failed cell that never
+created the binding.
 
 ## Browser Safety
 
@@ -314,6 +315,67 @@ not call methods that are not listed here.
 | `browser.tabs.selected()` | Return the selected `Tab` |
 | `browser.tabs.get(id)` | Return a tab by ID |
 | `browser.tabs.new()` | Open and return a blank tab |
+
+### Google Accounts
+
+Use `googleAccounts.print()` for a concise list of the Google accounts signed in
+to the current Safari session. Use `googleAccounts.list()` for structured
+results containing `accountId`, `name`, `email`, and `profileImageUrl`.
+
+Both methods are synchronous. Safari Apple Events does not expose the browser's
+cookie store, so each call uses a temporary background tab to load Google's
+sign-out options page, then closes that tab before returning. No existing Google
+tab is required, and raw cookies are never returned.
+
+Do not assume account `0` is the intended account. Match an email address the
+user already specified, or ask before a consequential action when multiple
+accounts make the target ambiguous.
+
+### Google Docs
+
+`googleDocs` is synchronous. Full-document reads use an authenticated mobile
+view in a temporary background tab. Editing opens a managed foreground tab and
+uses trusted native keyboard and clipboard input; always close it with
+`googleDocs.dispose()`.
+
+| Method | Purpose |
+|---|---|
+| `googleDocs.parseUrl(url)` | Return `{ docId, uid? }` |
+| `googleDocs.getDocumentHTML(target)` | Read mobile-view HTML |
+| `googleDocs.getDocumentText(target)` | Read mobile-view plain text |
+| `googleDocs.create(accountId)` | Create and connect a document |
+| `googleDocs.connect(url)` | Connect an existing document |
+| `googleDocs.dispose()` | Close the managed tab |
+| `googleDocs.getTitle()` | Read the live title |
+| `googleDocs.getLiveText()` | Select all and copy live text |
+| `googleDocs.getSelectedContent()` | Copy `{ text, html }` |
+| `googleDocs.insertText(text)` | Paste plain text |
+| `googleDocs.selectAll()` | Select all document content |
+| `googleDocs.insertHtmlContent(html)` | Paste rich HTML |
+| `googleDocs.deleteSelection()` | Delete the current selection |
+
+### Google Sheets
+
+`googleSheets` is synchronous. Reads and writes use a managed Sheets editor.
+Native copy and paste bring the tab to the foreground and restore all original
+clipboard formats afterward. Always close a connected editor with
+`googleSheets.dispose()`.
+
+| Method | Purpose |
+|---|---|
+| `googleSheets.parseUrl(url)` | Return `{ spreadsheetId, uid?, gid? }` |
+| `googleSheets.getSpreadsheetInfo(target)` | Read title and sheet metadata |
+| `googleSheets.readSheet(target, gid?)` | Read one used region |
+| `googleSheets.readAllSheets(target)` | Read all discovered sheets |
+| `googleSheets.create(accountId)` | Create and connect a spreadsheet |
+| `googleSheets.connect(url)` | Connect an existing spreadsheet |
+| `googleSheets.dispose()` | Close the managed tab |
+| `googleSheets.writeMatrix(range, data)` | Paste a 2D array |
+| `googleSheets.writeTsv(range, tsv)` | Paste TSV |
+| `googleSheets.writeHtml(range, html)` | Paste rich HTML |
+| `googleSheets.navigateToCell(cell)` | Select an A1 cell or range |
+| `googleSheets.switchSheet(gid)` | Switch by numeric sheet gid |
+| `googleSheets.readSelection()` | Copy `{ range, tsv, html }` |
 
 ### Tab
 

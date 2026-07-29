@@ -1,5 +1,6 @@
 ObjC.import("Foundation");
 ObjC.import("CoreGraphics");
+ObjC.import("AppKit");
 ObjC.bindFunction(
   "CGWindowListCopyWindowInfo",
   ["id", ["uint32", "uint32"]]
@@ -12,6 +13,14 @@ ObjC.bindFunction(
 /*__SBU_TOOL_DEFINITIONS__*/
 
 /*__SBU_NATIVE_INPUT__*/
+
+/*__SBU_GOOGLE_ACCOUNTS__*/
+
+/*__SBU_GOOGLE_DOCS__*/
+
+/*__SBU_GOOGLE_SHEETS__*/
+
+/*__SBU_GOOGLE_WORKSPACE_EDITOR__*/
 
 /*__SBU_CONTROL_LIFECYCLE__*/
 
@@ -191,6 +200,46 @@ var run = (function (globalObject) {
     return currentTabMetadata();
   }
 
+  function readBackgroundPageSource(url) {
+    var windows = safari.windows();
+
+    if (windows.length === 0) {
+      throw new Error("Safari has no open windows.");
+    }
+
+    return loadTemporaryPageSource(url, {
+      open: function (pageUrl) {
+        var tab = safari.Tab({ url: pageUrl });
+        windows[0].tabs.push(tab);
+        return tab;
+      },
+      inspect: function (tab) {
+        var rawState = safari.doJavaScript(
+          [
+            "JSON.stringify({",
+            "url: window.location.href,",
+            "readyState: document.readyState",
+            "})"
+          ].join(" "),
+          { in: tab }
+        );
+        var state = JSON.parse(String(rawState));
+        state.source = String(tab.source() || "");
+        return state;
+      },
+      close: function (tab) {
+        tab.close();
+      },
+      sleep: function (milliseconds) {
+        foundation.NSThread.sleepForTimeInterval(
+          milliseconds / 1000
+        );
+      },
+      now: Date.now,
+      timeoutMs: 15000
+    });
+  }
+
   function pageJavaScript(method, params) {
     var runtime = runPageOperation.toString();
 
@@ -216,11 +265,10 @@ var run = (function (globalObject) {
     ].join(" ");
   }
 
-  function runPage(method, params) {
-    var target = findTab(params.tabId);
+  function runPageInTab(tab, method, params) {
     var raw = safari.doJavaScript(
       pageJavaScript(method, params),
-      { in: target.tab }
+      { in: tab }
     );
     var envelope;
 
@@ -237,6 +285,14 @@ var run = (function (globalObject) {
     }
 
     return envelope.value;
+  }
+
+  function runPage(method, params) {
+    return runPageInTab(
+      findTab(params.tabId).tab,
+      method,
+      params
+    );
   }
 
   function runGesture(params) {
@@ -322,6 +378,137 @@ var run = (function (globalObject) {
     }
   }
 
+  function saveNativeClipboard() {
+    var pasteboard = foundation.NSPasteboard.generalPasteboard;
+    var sourceItems = pasteboard.pasteboardItems;
+    var savedItems = [];
+
+    for (
+      var itemIndex = 0;
+      itemIndex < Number(sourceItems.count);
+      itemIndex++
+    ) {
+      var sourceItem = sourceItems.objectAtIndex(itemIndex);
+      var sourceTypes = sourceItem.types;
+      var savedValues = [];
+
+      for (
+        var typeIndex = 0;
+        typeIndex < Number(sourceTypes.count);
+        typeIndex++
+      ) {
+        var sourceType = sourceTypes.objectAtIndex(typeIndex);
+        savedValues.push({
+          type: String(ObjC.unwrap(sourceType)),
+          data: sourceItem.dataForType(sourceType)
+        });
+      }
+
+      savedItems.push(savedValues);
+    }
+
+    return savedItems;
+  }
+
+  function restoreNativeClipboard(savedItems) {
+    var pasteboard = foundation.NSPasteboard.generalPasteboard;
+    var restoredItems = [];
+
+    pasteboard.clearContents;
+
+    for (var itemIndex = 0; itemIndex < savedItems.length; itemIndex++) {
+      var restoredItem = foundation.NSPasteboardItem.alloc.init;
+      var values = savedItems[itemIndex];
+
+      for (var valueIndex = 0; valueIndex < values.length; valueIndex++) {
+        restoredItem.setDataForType(
+          values[valueIndex].data,
+          foundation(values[valueIndex].type)
+        );
+      }
+
+      restoredItems.push(restoredItem);
+    }
+
+    if (restoredItems.length > 0) {
+      pasteboard.writeObjects(foundation(restoredItems));
+    }
+  }
+
+  function writeNativeClipboard(content) {
+    var pasteboard = foundation.NSPasteboard.generalPasteboard;
+    var item = foundation.NSPasteboardItem.alloc.init;
+    var text = content && content.text !== undefined
+      ? String(content.text)
+      : "";
+
+    item.setStringForType(
+      foundation(text),
+      foundation.NSPasteboardTypeString
+    );
+
+    if (content && content.html !== undefined) {
+      item.setStringForType(
+        foundation(String(content.html)),
+        foundation.NSPasteboardTypeHTML
+      );
+    }
+
+    pasteboard.clearContents;
+    pasteboard.writeObjects(foundation([item]));
+  }
+
+  function readNativeClipboard() {
+    var pasteboard = foundation.NSPasteboard.generalPasteboard;
+    var text = pasteboard.stringForType(
+      foundation.NSPasteboardTypeString
+    );
+    var html = pasteboard.stringForType(
+      foundation.NSPasteboardTypeHTML
+    );
+
+    return {
+      text: text ? String(ObjC.unwrap(text)) : "",
+      html: html ? String(ObjC.unwrap(html)) : ""
+    };
+  }
+
+  function postNativeShortcut(key, modifiers) {
+    var modifierNames = {
+      command: "command down",
+      control: "control down",
+      option: "option down",
+      shift: "shift down"
+    };
+    var using = (modifiers || []).map(function (modifier) {
+      var value = modifierNames[modifier];
+
+      if (!value) {
+        throw new Error(
+          "native_input_unsupported_modifier: " + modifier
+        );
+      }
+
+      return value;
+    });
+    var options = using.length > 0 ? { using: using } : {};
+
+    try {
+      if (key === "delete") {
+        systemEvents.keyCode(51, options);
+      } else if (key === "enter") {
+        systemEvents.keyCode(36, options);
+      } else {
+        systemEvents.keystroke(String(key), options);
+      }
+    } catch (error) {
+      throw new Error(
+        "native_input_permission_denied: allow accessibility " +
+        "control for the app running Safari Browser Use"
+      );
+    }
+  }
+
   var nativeInput = createNativeInput({
     focus: focusNativeTarget,
     readViewport: function (tabId) {
@@ -330,10 +517,27 @@ var run = (function (globalObject) {
       });
     },
     readWindowBounds: nativeWindowBounds,
-    postClick: postNativeClick
+    postClick: postNativeClick,
+    saveClipboard: saveNativeClipboard,
+    writeClipboard: writeNativeClipboard,
+    readClipboard: readNativeClipboard,
+    restoreClipboard: restoreNativeClipboard,
+    postShortcut: postNativeShortcut,
+    sleep: function (milliseconds) {
+      foundation.NSThread.sleepForTimeInterval(
+        milliseconds / 1000
+      );
+    }
   });
 
   function runNativeClick(params) {
+    runPage("playwright.gestureHighlight", {
+      tabId: params.tabId,
+      kind: "click",
+      x: params.x,
+      y: params.y
+    });
+
     return nativeInput.clickAt(
       params.tabId,
       params.x,
@@ -673,7 +877,14 @@ var run = (function (globalObject) {
     }
 
     if (method === "playwright.nativeClickAt") {
-      return runNativeClick(params);
+      var nativeClickState = navigationInitialState(params.tabId);
+      var nativeClickResult = runNativeClick(params);
+      restoreAfterPossibleNavigation(
+        params.tabId,
+        nativeClickState,
+        false
+      );
+      return nativeClickResult;
     }
 
     if (method === "playwright.locator.waitFor") {
@@ -1341,8 +1552,340 @@ var run = (function (globalObject) {
     })
   });
 
+  function openGoogleEditor(url, kind) {
+    var allowed = kind === "docs"
+      ? /^https:\/\/docs\.google\.com\/document\//i
+      : /^https:\/\/docs\.google\.com\/spreadsheets\//i;
+
+    if (!allowed.test(String(url))) {
+      throw new Error("invalid_google_" + kind + "_url");
+    }
+
+    var windows = safari.windows();
+
+    if (windows.length === 0) {
+      throw new Error("Safari has no open windows.");
+    }
+
+    var window = windows[0];
+    var rawTab = safari.Tab({ url: String(url) });
+    window.tabs.push(rawTab);
+    window.currentTab = rawTab;
+
+    function tabId() {
+      return (
+        String(window.id()) + ":" +
+        String(Number(rawTab.index()))
+      );
+    }
+
+    function inspect(tab, method) {
+      return {
+        url: String(tab.url() || ""),
+        editorState: runPageInTab(tab, method, {})
+      };
+    }
+
+    try {
+      waitForGoogleEditorReady(kind, rawTab, {
+        inspect: inspect,
+        now: Date.now,
+        sleep: function (milliseconds) {
+          foundation.NSThread.sleepForTimeInterval(
+            milliseconds / 1000
+          );
+        },
+        timeoutMs: 30000
+      });
+
+      controlLifecycle.activate(tabId());
+      ensureControlIndicator(tabId());
+
+      return {
+        id: tabId,
+        url: function () {
+          return String(rawTab.url() || "");
+        },
+        source: function () {
+          return String(rawTab.source() || "");
+        },
+        state: function () {
+          return inspect(
+            rawTab,
+            kind === "docs"
+              ? "googleDocs.editorState"
+              : "googleSheets.editorState"
+          ).editorState;
+        },
+        navigate: function (pageUrl) {
+          rawTab.url = String(pageUrl);
+          waitForGoogleEditorReady(kind, rawTab, {
+            inspect: inspect,
+            now: Date.now,
+            sleep: function (milliseconds) {
+              foundation.NSThread.sleepForTimeInterval(
+                milliseconds / 1000
+              );
+            },
+            timeoutMs: 30000
+          });
+          controlLifecycle.activate(tabId());
+          ensureControlIndicator(tabId());
+        },
+        close: function () {
+          rawTab.close();
+        }
+      };
+    } catch (error) {
+      rawTab.close();
+      throw error;
+    }
+  }
+
+  function googleDocsEditor(url) {
+    var managedTab = openGoogleEditor(url, "docs");
+    var focused = false;
+
+    function state() {
+      return managedTab.state();
+    }
+
+    function focusEditor() {
+      var current = state();
+
+      if (!current.editorPoint) {
+        throw new Error("google_docs_editor_not_ready");
+      }
+
+      nativeInput.clickAt(
+        managedTab.id(),
+        current.editorPoint.x,
+        current.editorPoint.y
+      );
+      foundation.NSThread.sleepForTimeInterval(0.1);
+      focused = true;
+    }
+
+    function ensureFocused() {
+      if (!focused) {
+        focusEditor();
+      }
+    }
+
+    return {
+      url: function () {
+        return managedTab.url();
+      },
+      getTitle: function () {
+        return state().title;
+      },
+      getLiveText: function () {
+        ensureFocused();
+        nativeInput.shortcut(
+          managedTab.id(),
+          "a",
+          ["command"]
+        );
+        return nativeInput.copy(managedTab.id()).text;
+      },
+      getSelectedContent: function () {
+        ensureFocused();
+        return nativeInput.copy(managedTab.id());
+      },
+      insertText: function (text) {
+        ensureFocused();
+        nativeInput.paste(managedTab.id(), { text: text });
+      },
+      selectAll: function () {
+        ensureFocused();
+        nativeInput.shortcut(
+          managedTab.id(),
+          "a",
+          ["command"]
+        );
+      },
+      insertHtmlContent: function (html) {
+        ensureFocused();
+        nativeInput.paste(managedTab.id(), {
+          text: googleDocsHtmlToText(html),
+          html: html
+        });
+      },
+      deleteSelection: function () {
+        ensureFocused();
+        nativeInput.shortcut(
+          managedTab.id(),
+          "delete",
+          []
+        );
+      },
+      close: function () {
+        managedTab.close();
+      }
+    };
+  }
+
+  function googleSheetsEditor(url) {
+    var managedTab = openGoogleEditor(url, "sheets");
+
+    function state() {
+      return managedTab.state();
+    }
+
+    function navigateToCell(cell) {
+      var target = String(cell).toUpperCase();
+
+      if (
+        !/^[A-Z]{1,4}\d+(?::[A-Z]{1,4}\d+)?$/.test(target)
+      ) {
+        throw new Error("invalid_google_sheets_range");
+      }
+
+      managedTab.navigate(
+        googleSheetsRangeUrl(managedTab.url(), target)
+      );
+      foundation.NSThread.sleepForTimeInterval(0.25);
+    }
+
+    function readSelection() {
+      var current = state();
+      var content = nativeInput.copy(managedTab.id());
+
+      return {
+        range: current.selectionRange,
+        tsv: content.text,
+        html: content.html
+      };
+    }
+
+    return {
+      url: function () {
+        return managedTab.url();
+      },
+      source: function () {
+        return managedTab.source();
+      },
+      state: state,
+      writeTsv: function (range, tsv) {
+        navigateToCell(range);
+        nativeInput.paste(managedTab.id(), { text: tsv });
+        foundation.NSThread.sleepForTimeInterval(0.25);
+      },
+      writeHtml: function (range, html) {
+        navigateToCell(range);
+        nativeInput.paste(managedTab.id(), {
+          text: googleDocsHtmlToText(html),
+          html: html
+        });
+        foundation.NSThread.sleepForTimeInterval(0.25);
+      },
+      navigateToCell: navigateToCell,
+      switchSheet: function (gid) {
+        var value = String(gid);
+
+        if (!/^\d+$/.test(value)) {
+          throw new Error("invalid_google_sheets_gid");
+        }
+
+        var currentUrl = managedTab.url().replace(/#.*$/, "");
+        managedTab.navigate(
+          currentUrl + "#gid=" + encodeURIComponent(value)
+        );
+      },
+      selectAll: function () {
+        nativeInput.shortcut(
+          managedTab.id(),
+          "a",
+          ["command"]
+        );
+      },
+      readSelection: readSelection,
+      close: function () {
+        managedTab.close();
+      }
+    };
+  }
+
+  function googleSheetsRuntimeUrl(target, gid) {
+    var account = target.uid === undefined
+      ? ""
+      : "/u/" + target.uid;
+    var hash = gid === undefined
+      ? ""
+      : "#gid=" + encodeURIComponent(String(gid));
+
+    return (
+      "https://docs.google.com/spreadsheets" + account +
+      "/d/" + target.spreadsheetId + "/edit" + hash
+    );
+  }
+
+  function readGoogleSpreadsheet(target) {
+    var editor = googleSheetsEditor(
+      googleSheetsRuntimeUrl(target, target.gid)
+    );
+
+    try {
+      var current = editor.state();
+
+      return {
+        docTitle: current.title,
+        sheets: parseGoogleSheetsBootstrap(editor.source())
+      };
+    } finally {
+      editor.close();
+    }
+  }
+
+  function readGoogleSheet(target, gid) {
+    var editor = googleSheetsEditor(
+      googleSheetsRuntimeUrl(target, gid)
+    );
+
+    try {
+      editor.navigateToCell("A1");
+      editor.selectAll();
+      var selection = editor.readSelection();
+      var selectedGid = gid === undefined
+        ? target.gid || "0"
+        : String(gid);
+      var sheet = parseGoogleSheetsBootstrap(
+        editor.source()
+      ).filter(function (candidate) {
+        return String(candidate.gid) === String(selectedGid);
+      })[0] || {
+        name: "",
+        gid: String(selectedGid),
+        gridId: String(selectedGid)
+      };
+
+      return tsvToSheetData(selection.tsv, sheet);
+    } finally {
+      editor.close();
+    }
+  }
+
+  var googleAccounts = createGoogleAccounts({
+    loadHtml: readBackgroundPageSource,
+    write: consoleWrite
+  });
+
+  var googleDocs = createGoogleDocs({
+    loadHtml: readBackgroundPageSource,
+    openEditor: googleDocsEditor
+  });
+
+  var googleSheets = createGoogleSheets({
+    readSpreadsheet: readGoogleSpreadsheet,
+    readSheet: readGoogleSheet,
+    openEditor: googleSheetsEditor
+  });
+
   globalObject.browser = browser;
   globalObject.console = replConsole;
+  globalObject.googleAccounts = googleAccounts;
+  globalObject.googleDocs = googleDocs;
+  globalObject.googleSheets = googleSheets;
 
   var baselineGlobals = Object.getOwnPropertyNames(globalObject);
 
@@ -1361,6 +1904,9 @@ var run = (function (globalObject) {
 
     globalObject.browser = browser;
     globalObject.console = replConsole;
+    globalObject.googleAccounts = googleAccounts;
+    globalObject.googleDocs = googleDocs;
+    globalObject.googleSheets = googleSheets;
   }
 
   function jsonValue(value) {

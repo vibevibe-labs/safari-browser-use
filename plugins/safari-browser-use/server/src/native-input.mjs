@@ -108,7 +108,13 @@ export function createNativeInput({
   focus,
   readViewport,
   readWindowBounds,
-  postClick
+  postClick,
+  saveClipboard,
+  writeClipboard,
+  readClipboard,
+  restoreClipboard,
+  postShortcut,
+  sleep
 }) {
   return {
     clickAt(tabId, x, y) {
@@ -132,6 +138,37 @@ export function createNativeInput({
         screen: screenPoint,
         viewport: viewportPoint
       };
+    },
+    paste(tabId, content) {
+      focus(tabId);
+      const saved = saveClipboard();
+
+      try {
+        writeClipboard(content);
+        postShortcut("v", ["command"]);
+        sleep(150);
+        return { pasted: true };
+      } finally {
+        restoreClipboard(saved);
+      }
+    },
+    copy(tabId) {
+      focus(tabId);
+      const saved = saveClipboard();
+
+      try {
+        postShortcut("c", ["command"]);
+        sleep(150);
+        return readClipboard();
+      } finally {
+        restoreClipboard(saved);
+      }
+    },
+    shortcut(tabId, key, modifiers) {
+      focus(tabId);
+      postShortcut(String(key), modifiers || []);
+      sleep(75);
+      return { pressed: true };
     }
   };
 }
