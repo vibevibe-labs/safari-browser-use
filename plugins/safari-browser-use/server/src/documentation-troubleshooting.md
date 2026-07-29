@@ -53,3 +53,10 @@ Read a new DOM snapshot and confirm the element still exists and is visible.
 Safari synthetic DOM events may not activate controls that require trusted native
 input. Closed shadow roots and cross-origin frames are not available through
 `do JavaScript`; report that limitation instead of retrying destructive actions.
+
+## Native Click Is Denied
+
+`nativeClickAt()` requires Accessibility permission for the app running Safari
+Browser Use. Ask the user to enable that app under System Settings > Privacy &
+Security > Accessibility, then retry the one confirmed click. Do not change the
+setting on the user's behalf.

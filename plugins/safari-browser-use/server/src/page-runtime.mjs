@@ -861,6 +861,26 @@ export function runPageOperation(
     };
   }
 
+  if (method === "playwright.viewportMetrics") {
+    const visualViewport = window.visualViewport;
+
+    return {
+      innerHeight: Number(window.innerHeight),
+      innerWidth: Number(window.innerWidth),
+      outerHeight: Number(window.outerHeight),
+      outerWidth: Number(window.outerWidth),
+      visualOffsetLeft: visualViewport
+        ? Number(visualViewport.offsetLeft)
+        : 0,
+      visualOffsetTop: visualViewport
+        ? Number(visualViewport.offsetTop)
+        : 0,
+      visualScale: visualViewport
+        ? Number(visualViewport.scale)
+        : 1
+    };
+  }
+
   if (method === "playwright.scrollBy") {
     const deltaX = Number(params.deltaX ?? 0);
     const deltaY = Number(params.deltaY ?? 0);

@@ -1,10 +1,17 @@
 ObjC.import("Foundation");
+ObjC.import("CoreGraphics");
+ObjC.bindFunction(
+  "CGWindowListCopyWindowInfo",
+  ["id", ["uint32", "uint32"]]
+);
 
 /*__SBU_PAGE_RUNTIME__*/
 
 /*__SBU_SAFARI_VERSION__*/
 
 /*__SBU_TOOL_DEFINITIONS__*/
+
+/*__SBU_NATIVE_INPUT__*/
 
 /*__SBU_CONTROL_LIFECYCLE__*/
 
@@ -17,6 +24,7 @@ ObjC.import("Foundation");
 var run = (function (globalObject) {
   var foundation = $;
   var safari = Application("Safari");
+  var systemEvents = Application("System Events");
   var input = foundation.NSFileHandle.fileHandleWithStandardInput;
   var output = foundation.NSFileHandle.fileHandleWithStandardOutput;
   var currentOutput = null;
@@ -104,25 +112,13 @@ var run = (function (globalObject) {
   }
 
   function listTabs() {
-    var result = [];
-    var windows = safari.windows();
-
-    for (
-      var windowIndex = 0;
-      windowIndex < windows.length;
-      windowIndex++
-    ) {
-      var window = windows[windowIndex];
-      var tabs = window.tabs();
-
-      for (var tabIndex = 0; tabIndex < tabs.length; tabIndex++) {
-        result.push(
-          tabMetadata(window, tabs[tabIndex], tabIndex + 1)
-        );
-      }
-    }
-
-    return result;
+    return collectTabs(
+      safari.windows(),
+      function (window) {
+        return window.tabs();
+      },
+      tabMetadata
+    );
   }
 
   function currentTabMetadata() {
@@ -260,6 +256,84 @@ var run = (function (globalObject) {
     }
 
     return { steps: dispatched };
+  }
+
+  function nativeWindowBounds(tabId) {
+    var windowId = parseTabId(tabId).windowId;
+    var windows = ObjC.deepUnwrap(
+      foundation.CGWindowListCopyWindowInfo(1, 0)
+    );
+
+    for (var index = 0; index < windows.length; index++) {
+      var window = windows[index];
+
+      if (
+        Number(window.kCGWindowNumber) !== windowId ||
+        Number(window.kCGWindowLayer) !== 0
+      ) {
+        continue;
+      }
+
+      var bounds = window.kCGWindowBounds || {};
+
+      return {
+        height: Number(bounds.Height),
+        width: Number(bounds.Width),
+        x: Number(bounds.X),
+        y: Number(bounds.Y)
+      };
+    }
+
+    throw new Error("native_click_window_not_visible");
+  }
+
+  function focusNativeTarget(tabId) {
+    var target = findTab(tabId);
+
+    target.window.currentTab = target.tab;
+    target.window.index = 1;
+    safari.activate();
+    foundation.NSThread.sleepForTimeInterval(0.15);
+
+    if (currentTabMetadata().id !== tabId) {
+      throw new Error("native_click_target_not_frontmost");
+    }
+  }
+
+  function postNativeClick(point) {
+    var process = systemEvents.processes.byName("Safari");
+
+    if (!process.exists()) {
+      throw new Error("native_click_safari_process_not_found");
+    }
+
+    try {
+      process.click({ at: [point.x, point.y] });
+    } catch (error) {
+      throw new Error(
+        "native_input_permission_denied: allow accessibility " +
+        "control for the app running Safari Browser Use"
+      );
+    }
+  }
+
+  var nativeInput = createNativeInput({
+    focus: focusNativeTarget,
+    readViewport: function (tabId) {
+      return runPage("playwright.viewportMetrics", {
+        tabId: tabId
+      });
+    },
+    readWindowBounds: nativeWindowBounds,
+    postClick: postNativeClick
+  });
+
+  function runNativeClick(params) {
+    return nativeInput.clickAt(
+      params.tabId,
+      params.x,
+      params.y
+    );
   }
 
   function mimeTypeForPath(path) {
@@ -502,6 +576,10 @@ var run = (function (globalObject) {
       findTab(params.tabId).tab.url = url;
       retargetTabIdentity(params.tabIdentity, url);
       return null;
+    }
+
+    if (method === "playwright.nativeClickAt") {
+      return runNativeClick(params);
     }
 
     if (method === "playwright.locator.waitFor") {
@@ -904,6 +982,14 @@ var run = (function (globalObject) {
       tabIdentity: this.tabIdentity,
       steps: steps,
       delayMs: options.delayMs
+    });
+  };
+
+  SafariPlaywright.prototype.nativeClickAt = function (x, y) {
+    return callSafari("playwright.nativeClickAt", {
+      tabIdentity: this.tabIdentity,
+      x: Number(x),
+      y: Number(y)
     });
   };
 

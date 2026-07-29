@@ -18,6 +18,54 @@ async function loadTabIdentity() {
   return module;
 }
 
+test("skips Safari windows that do not expose tabs", async () => {
+  const { collectTabs } = await loadTabIdentity();
+  const windows = [
+    { id: "primary", tabs: [{ title: "Example" }] },
+    { id: "auxiliary", tabs: null }
+  ];
+
+  assert.deepEqual(
+    collectTabs(
+      windows,
+      window => window.tabs,
+      (window, tab, tabIndex) => ({
+        id: `${window.id}:${tabIndex}`,
+        title: tab.title
+      })
+    ),
+    [{ id: "primary:1", title: "Example" }]
+  );
+});
+
+test("skips Safari windows whose tab collection fails", async () => {
+  const { collectTabs } = await loadTabIdentity();
+  const windows = [
+    { id: "primary", tabs: [{ title: "Example" }] },
+    { id: "oauth-popup" }
+  ];
+
+  assert.deepEqual(
+    collectTabs(
+      windows,
+      window => {
+        if (!window.tabs) {
+          throw new TypeError(
+            "null is not an object (evaluating 'tabs.length')"
+          );
+        }
+
+        return window.tabs;
+      },
+      (window, tab, tabIndex) => ({
+        id: `${window.id}:${tabIndex}`,
+        title: tab.title
+      })
+    ),
+    [{ id: "primary:1", title: "Example" }]
+  );
+});
+
 test("reacquires a tab after its Safari index changes", async () => {
   const {
     createTabIdentity,

@@ -234,6 +234,22 @@ tab.playwright.drag(fromX, fromY, toX, toY, { steps: 12 })
 Convert a pixel in the returned image to a click coordinate with
 `source.viewport`, as described in the API Reference below.
 
+## Native Coordinate Input
+
+`tab.playwright.nativeClickAt(x, y)` sends one macOS accessibility click at an
+exact viewport coordinate. Use it only as a fallback for a cross-origin iframe
+or another control that requires trusted input, after the user gives explicit
+confirmation for that interaction.
+
+The call brings the target Safari tab and window to the foreground before
+clicking. Base the coordinates on the current visible state, never guess or
+reuse them after scrolling, resizing, zooming, or other layout changes. Prefer
+locators for DOM controls and `clickAt()` for same-document canvas surfaces.
+
+Native input requires Accessibility permission for the app running Safari
+Browser Use. A permission failure does not authorize changing system settings;
+report the requirement to the user.
+
 ## Virtualized and Infinite Lists
 
 Virtualized lists keep only the current batch of items in the DOM. Collect them
@@ -308,6 +324,7 @@ not call methods that are not listed here.
 | `tab.playwright.canvasSnapshot(selector, options?)` | Capture one `<canvas>` as an image the model can see |
 | `tab.playwright.scrollBy(deltaX, deltaY)` | Scroll the page by explicit pixel offsets |
 | `tab.playwright.clickAt(x, y, options?)` | Click at viewport coordinates (for `<canvas>` / drawing surfaces) |
+| `tab.playwright.nativeClickAt(x, y)` | Send one native macOS click at a viewport coordinate |
 | `tab.playwright.drag(fromX, fromY, toX, toY, options?)` | Drag a pointer path between viewport coordinates |
 | `tab.playwright.waitForURL(expected, options?)` | Wait for a URL substring, or an exact URL with `{ exact: true }` |
 | `tab.playwright.waitForLoadState(options?)` | Wait for `complete`, or `{ state: "interactive" }` |
@@ -412,6 +429,9 @@ click coordinate: `clickAt(viewport.x + px * viewport.width / image.width, …)`
 `options.maxSize` (default `1280`) downsamples large canvases to bound payload.
 `clickAt()` and `drag()` dispatch coordinate `PointerEvent`s (plus their mouse
 equivalents) spaced across event-loop ticks, which real 2D-canvas apps accept.
+Those synthetic events cannot enter a cross-origin iframe; use
+`nativeClickAt()` only under the constraints above when trusted input is
+required.
 
 Known limits:
 

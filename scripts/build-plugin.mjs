@@ -22,6 +22,10 @@ const toolDefinitionsPath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/tool-definitions.mjs"
 );
+const nativeInputPath = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/server/src/native-input.mjs"
+);
 const controlLifecyclePath = resolve(
   repositoryRoot,
   "plugins/safari-browser-use/server/src/control-lifecycle.mjs"
@@ -49,6 +53,7 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     pageRuntime,
     safariVersion,
     toolDefinitions,
+    nativeInput,
     controlLifecycle,
     tabIdentity,
     documentation,
@@ -58,6 +63,7 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     readFile(pageRuntimePath, "utf8"),
     readFile(safariVersionPath, "utf8"),
     readFile(toolDefinitionsPath, "utf8"),
+    readFile(nativeInputPath, "utf8"),
     readFile(controlLifecyclePath, "utf8"),
     readFile(tabIdentityPath, "utf8"),
     readFile(documentationPath, "utf8"),
@@ -77,6 +83,10 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
     .replace(
       "/*__SBU_TOOL_DEFINITIONS__*/",
       withoutExports(toolDefinitions)
+    )
+    .replace(
+      "/*__SBU_NATIVE_INPUT__*/",
+      withoutExports(nativeInput)
     )
     .replace(
       "/*__SBU_CONTROL_LIFECYCLE__*/",
