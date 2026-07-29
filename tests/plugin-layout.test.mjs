@@ -270,6 +270,10 @@ test("navigation docs prefer state waits and stable tab recovery", async () => {
   assert.match(guide, /stale_tab_handle/);
   assert.match(guide, /href.*localized text/is);
   assert.match(guide, /automatically reacquire/i);
+  assert.match(
+    guide,
+    /same browser\s+call.*restore.*control indicator/is
+  );
 });
 
 test("runtime guide documents bounded virtualized-list collection", async () => {
@@ -306,6 +310,41 @@ test("control indicator docs describe only the page overlay", async () => {
     assert.match(document, /(?:fake|visible) cursor/i);
     assert.doesNotMatch(document, /favicon/i);
     assert.doesNotMatch(document, /compact Safari\s+tabs/i);
+  }
+});
+
+test("control indicator inactivity lease is 60 seconds", async () => {
+  const [template, pageRuntime, ...documents] = await Promise.all([
+    readFile(
+      new URL("server/src/jxa-server.template.js", pluginRoot),
+      "utf8"
+    ),
+    readFile(
+      new URL("server/src/page-runtime.mjs", pluginRoot),
+      "utf8"
+    ),
+    readFile(new URL("README.md", repositoryRoot), "utf8"),
+    readFile(
+      new URL("server/src/documentation.md", pluginRoot),
+      "utf8"
+    ),
+    readFile(
+      new URL(
+        "server/src/documentation-troubleshooting.md",
+        pluginRoot
+      ),
+      "utf8"
+    )
+  ]);
+
+  assert.equal((template.match(/leaseMs: 60000/g) || []).length, 3);
+  assert.doesNotMatch(template, /leaseMs: 45000/);
+  assert.match(pageRuntime, /: 60_000;/);
+  assert.doesNotMatch(pageRuntime, /: 45_000;/);
+
+  for (const document of documents) {
+    assert.match(document, /60 seconds|60-second/);
+    assert.doesNotMatch(document, /45 seconds|45-second/);
   }
 });
 

@@ -248,6 +248,11 @@ var run = (function (globalObject) {
     var delayMs = Number(params.delayMs) > 0 ? Number(params.delayMs) : 90;
     var dispatched = 0;
 
+    if (params.highlight) {
+      params.highlight.tabId = params.tabId;
+      runPage("playwright.gestureHighlight", params.highlight);
+    }
+
     for (var index = 0; index < steps.length; index++) {
       var step = steps[index];
       step.tabId = params.tabId;
@@ -313,7 +318,7 @@ var run = (function (globalObject) {
       try {
         runPage("control.show", {
           tabId: tabId,
-          leaseMs: 45000
+          leaseMs: 60000
         });
       } catch (error) {
         // The indicator must never block the browser operation.
@@ -323,7 +328,7 @@ var run = (function (globalObject) {
       try {
         runPage("control.show", {
           tabId: tabId,
-          leaseMs: 45000
+          leaseMs: 60000
         });
       } catch (error) {
         // Navigation may be replacing the page document.
@@ -337,6 +342,78 @@ var run = (function (globalObject) {
       }
     }
   });
+
+  function inspectControlledDocument(tabId) {
+    var state = runPage("playwright.pageState", {
+      tabId: tabId
+    });
+    var tabUrl = findTab(tabId).tab.url();
+    state.tabUrl = tabUrl === null ? "" : String(tabUrl);
+    return state;
+  }
+
+  function ensureControlIndicator(tabId) {
+    var shown = runPage("control.show", {
+      tabId: tabId,
+      leaseMs: 60000
+    });
+    var verified = inspectControlledDocument(tabId);
+
+    if (!shown.visible || !verified.controlVisible) {
+      throw new Error("control_indicator_restore_failed");
+    }
+
+    return verified;
+  }
+
+  function restoreControlForNavigation(
+    tabId,
+    initialState,
+    options
+  ) {
+    options = options || {};
+
+    return restoreControlAfterNavigation({
+      changeTimeoutMs: options.changeTimeoutMs,
+      initialDocumentId: initialState.documentId,
+      initialUrl: initialState.tabUrl,
+      inspect: function () {
+        return inspectControlledDocument(tabId);
+      },
+      restore: function () {
+        ensureControlIndicator(tabId);
+      },
+      sleep: function (milliseconds) {
+        foundation.NSThread.sleepForTimeInterval(
+          milliseconds / 1000
+        );
+      },
+      timeoutMs: options.timeoutMs
+    });
+  }
+
+  function navigationInitialState(tabId) {
+    try {
+      return inspectControlledDocument(tabId);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function restoreAfterPossibleNavigation(
+    tabId,
+    initialState,
+    navigationExpected
+  ) {
+    if (!initialState) {
+      return;
+    }
+
+    restoreControlForNavigation(tabId, initialState, {
+      changeTimeoutMs: navigationExpected ? 1000 : 250,
+      timeoutMs: 10000
+    });
+  }
 
   function waitFor(params) {
     var options = params.options || {};
@@ -387,12 +464,23 @@ var run = (function (globalObject) {
       });
 
       if (candidates.length === 1) {
-        updateTabIdentity(params.tabIdentity, candidates[0]);
-        controlLifecycle.activate(candidates[0].id);
-        return {
-          matched: true,
-          url: candidates[0].url
-        };
+        try {
+          var pageState = inspectControlledDocument(
+            candidates[0].id
+          );
+
+          if (pageState.url === candidates[0].url) {
+            updateTabIdentity(params.tabIdentity, candidates[0]);
+            controlLifecycle.activate(candidates[0].id);
+            ensureControlIndicator(candidates[0].id);
+            return {
+              matched: true,
+              url: candidates[0].url
+            };
+          }
+        } catch (error) {
+          // Safari may still be replacing the page document.
+        }
       }
 
       if (candidates.length > 1) {
@@ -439,6 +527,7 @@ var run = (function (globalObject) {
 
         if (matched) {
           controlLifecycle.activate(metadata.id);
+          ensureControlIndicator(metadata.id);
           return {
             matched: true,
             state: pageState.readyState
@@ -499,8 +588,13 @@ var run = (function (globalObject) {
         throw new Error("Only HTTP and HTTPS URLs are allowed.");
       }
 
+      var initialState = inspectControlledDocument(params.tabId);
       findTab(params.tabId).tab.url = url;
       retargetTabIdentity(params.tabIdentity, url);
+      restoreControlForNavigation(params.tabId, initialState, {
+        changeTimeoutMs: 10000,
+        timeoutMs: 10000
+      });
       return null;
     }
 
@@ -509,11 +603,52 @@ var run = (function (globalObject) {
     }
 
     if (method === "playwright.gesture") {
-      return runGesture(params);
+      var gestureState = navigationInitialState(params.tabId);
+      var gestureResult = runGesture(params);
+      restoreAfterPossibleNavigation(
+        params.tabId,
+        gestureState,
+        false
+      );
+      return gestureResult;
     }
 
     if (method.indexOf("playwright.") === 0) {
-      return runPage(method, params);
+      var navigationMethods = [
+        "playwright.locator.click",
+        "playwright.locator.press",
+        "playwright.locator.selectOption"
+      ];
+      var mayNavigate =
+        navigationMethods.indexOf(method) !== -1;
+      var operationState = mayNavigate
+        ? navigationInitialState(params.tabId)
+        : null;
+      var operationResult = runPage(method, params);
+      var navigationExpected = Boolean(
+        operationResult &&
+        operationResult.navigationExpected
+      );
+
+      if (
+        operationResult &&
+        Object.prototype.hasOwnProperty.call(
+          operationResult,
+          "navigationExpected"
+        )
+      ) {
+        delete operationResult.navigationExpected;
+      }
+
+      if (mayNavigate) {
+        restoreAfterPossibleNavigation(
+          params.tabId,
+          operationState,
+          navigationExpected
+        );
+      }
+
+      return operationResult;
     }
 
     throw new Error("Unsupported Safari operation: " + method);
@@ -903,7 +1038,12 @@ var run = (function (globalObject) {
     return callSafari("playwright.gesture", {
       tabIdentity: this.tabIdentity,
       steps: steps,
-      delayMs: options.delayMs
+      delayMs: options.delayMs,
+      highlight: {
+        kind: "click",
+        x: point.x,
+        y: point.y
+      }
     });
   };
 
@@ -944,7 +1084,14 @@ var run = (function (globalObject) {
     return callSafari("playwright.gesture", {
       tabIdentity: this.tabIdentity,
       steps: steps,
-      delayMs: options.delayMs
+      delayMs: options.delayMs,
+      highlight: {
+        kind: "drag",
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y
+      }
     });
   };
 

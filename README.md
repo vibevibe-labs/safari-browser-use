@@ -140,7 +140,8 @@ want a clean REPL context.
 Selecting or operating a tab adds a non-interactive perimeter glow and visible
 fake cursor to the controlled page. They share one control lifecycle: both are
 removed with `browser.release()` when the task ends and clear automatically
-after 45 seconds without tab activity.
+after 60 seconds without tab activity. Navigation-capable operations restore
+the indicator in the new page before the same browser call returns.
 
 ## Highlights
 
