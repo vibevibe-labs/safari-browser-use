@@ -4,6 +4,41 @@ function tabWindowId(tabId) {
   return match ? match[1] : "";
 }
 
+export function collectTabs(
+  windows,
+  readTabs,
+  describeTab
+) {
+  const result = [];
+
+  for (
+    let windowIndex = 0;
+    windowIndex < windows.length;
+    windowIndex++
+  ) {
+    const window = windows[windowIndex];
+    let tabs;
+
+    try {
+      tabs = readTabs(window);
+    } catch (error) {
+      continue;
+    }
+
+    if (!tabs) {
+      continue;
+    }
+
+    for (let tabIndex = 0; tabIndex < tabs.length; tabIndex++) {
+      result.push(
+        describeTab(window, tabs[tabIndex], tabIndex + 1)
+      );
+    }
+  }
+
+  return result;
+}
+
 export function createTabIdentity(metadata) {
   return {
     id: String(metadata.id),

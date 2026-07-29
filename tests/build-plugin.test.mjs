@@ -59,6 +59,26 @@ test("builds a self-contained JXA MCP server", async t => {
     bundle,
     /pageState\.url === metadata\.url/
   );
+  assert.match(bundle, /function restoreControlAfterNavigation/);
+  assert.match(bundle, /documentId/);
+  assert.ok(
+    (bundle.match(/restoreControlAfterNavigation\(/g) || []).length >= 2
+  );
+  const runGesture = bundle.match(
+    /function runGesture[\s\S]*?\n  function mimeTypeForPath/m
+  )?.[0] ?? "";
+  assert.match(
+    runGesture,
+    /runPage\("playwright\.gestureHighlight"/
+  );
+  const clickAt = bundle.match(
+    /SafariPlaywright\.prototype\.clickAt[\s\S]*?\n  };/m
+  )?.[0] ?? "";
+  const drag = bundle.match(
+    /SafariPlaywright\.prototype\.drag[\s\S]*?\n  };/m
+  )?.[0] ?? "";
+  assert.match(clickAt, /kind: "click"/);
+  assert.match(drag, /kind: "drag"/);
   const waitForTimeout = bundle.match(
     /SafariPlaywright\.prototype\.waitForTimeout[\s\S]*?\n  };/m
   )?.[0] ?? "";

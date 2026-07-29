@@ -26,6 +26,98 @@ function createPage(html) {
   };
 }
 
+test("inspects the Google Docs title and native editor point", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Project note">
+    <div class="kix-appview-editor"></div>
+  `);
+  const editor = window.document.querySelector(
+    ".kix-appview-editor"
+  );
+  editor.getBoundingClientRect = () => ({
+    left: 100,
+    top: 200,
+    width: 600,
+    height: 800,
+    right: 700,
+    bottom: 1000
+  });
+
+  assert.deepEqual(execute("googleDocs.editorState"), {
+    title: "Project note",
+    editorPoint: { x: 400, y: 600 }
+  });
+});
+
+test("inspects Google Sheets tabs, selection, and native grid point", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Budget">
+    <input class="waffle-name-box" value="B5">
+    <div class="docs-sheet-tab" data-sheet-id="0">
+      <span class="docs-sheet-tab-name">Summary</span>
+    </div>
+    <div class="docs-sheet-tab" data-sheet-id="42">
+      <span class="docs-sheet-tab-name">Archive</span>
+    </div>
+    <div class="waffle-grid-container"></div>
+  `);
+  const grid = window.document.querySelector(
+    ".waffle-grid-container"
+  );
+  const nameBox = window.document.querySelector(
+    ".waffle-name-box"
+  );
+  nameBox.getBoundingClientRect = () => ({
+    left: 10,
+    top: 80,
+    width: 120,
+    height: 30,
+    right: 130,
+    bottom: 110
+  });
+  grid.getBoundingClientRect = () => ({
+    left: 50,
+    top: 150,
+    width: 900,
+    height: 600,
+    right: 950,
+    bottom: 750
+  });
+
+  assert.deepEqual(execute("googleSheets.editorState"), {
+    title: "Budget",
+    selectionRange: "B5",
+    nameBoxPoint: { x: 70, y: 95 },
+    sheets: [
+      { name: "Summary", gid: "0", gridId: "0" },
+      { name: "Archive", gid: "42", gridId: "42" }
+    ],
+    editorPoint: { x: 500, y: 450 }
+  });
+});
+
+test("uses the Sheets canvas when the generic grid wrapper has no size", () => {
+  const { execute, window } = createPage(`
+    <input class="docs-title-input" value="Budget">
+    <div class="grid-container"></div>
+    <canvas></canvas>
+  `);
+  const canvas = window.document.querySelector("canvas");
+  canvas.getBoundingClientRect = () => ({
+    left: 40,
+    top: 120,
+    width: 800,
+    height: 500,
+    right: 840,
+    bottom: 620
+  });
+
+  assert.deepEqual(
+    execute("googleSheets.editorState").editorPoint,
+    { x: 440, y: 370 }
+  );
+});
+
 test("returns a Playwright-style DOM snapshot", () => {
   const { execute } = createPage(`
     <label for="email">Email address</label>
@@ -293,13 +385,14 @@ test("reports the loaded document URL with its readiness state", () => {
   });
   window.history.replaceState({}, "", "/dashboard");
 
-  assert.deepEqual(
-    execute("playwright.pageState"),
-    {
-      readyState: "complete",
-      url: "https://example.com/dashboard"
-    }
-  );
+  const first = execute("playwright.pageState");
+  const second = execute("playwright.pageState");
+
+  assert.equal(first.readyState, "complete");
+  assert.equal(first.url, "https://example.com/dashboard");
+  assert.equal(first.controlVisible, false);
+  assert.match(first.documentId, /^document-/);
+  assert.equal(second.documentId, first.documentId);
 });
 
 test("scrolls the page by explicit offsets", () => {
@@ -462,6 +555,31 @@ test("reports supported key events as synthetic", () => {
       trusted: false
     }
   );
+});
+
+test("marks same-tab link clicks as navigation-capable", () => {
+  const { execute, window } = createPage(`
+    <a href="https://example.com/next">Continue</a>
+  `);
+  const link = window.document.querySelector("a");
+  link.addEventListener("click", event => event.preventDefault());
+
+  const result = execute("playwright.locator.click", {
+    locator: [{
+      type: "role",
+      role: "link",
+      name: "Continue",
+      exact: true
+    }],
+    options: {}
+  });
+
+  assert.deepEqual(result, {
+    clicked: true,
+    navigationExpected: true
+  });
+
+  execute("control.hide");
 });
 
 test("shows one non-interactive AI control indicator", () => {
@@ -899,10 +1017,15 @@ test("glides the fake cursor to a clicked element", () => {
   // The cursor left its parked corner and now sits over the element.
   assert.equal(cursor.style.right, "auto");
   assert.equal(cursor.style.bottom, "auto");
-  const left = parseFloat(cursor.style.left);
-  const top = parseFloat(cursor.style.top);
+  const transform = cursor.style.transform.match(
+    /translate3d\(([-\d.]+)px,\s*([-\d.]+)px,\s*0px\)/
+  );
+  assert.notEqual(transform, null);
+  const left = Number(transform[1]) + 3;
+  const top = Number(transform[2]) + 2;
   assert.ok(left >= 200 && left <= 300, `left ${left} within element`);
   assert.ok(top >= 120 && top <= 160, `top ${top} within element`);
+  execute("control.hide");
 });
 
 test("glides the fake cursor along a coordinate gesture", () => {
@@ -925,8 +1048,81 @@ test("glides the fake cursor along a coordinate gesture", () => {
 
   assert.notEqual(cursor, null);
   assert.equal(cursor.style.right, "auto");
-  assert.equal(parseFloat(cursor.style.left), 64 - 3);
-  assert.equal(parseFloat(cursor.style.top), 48 - 2);
+  assert.equal(cursor.style.bottom, "auto");
+  assert.equal(cursor.style.left, "0px");
+  assert.equal(cursor.style.top, "0px");
+  assert.equal(
+    cursor.style.transform,
+    `translate3d(${64 - 3}px, ${48 - 2}px, 0px)`
+  );
+  assert.match(cursor.style.transition, /^transform 90ms/);
+  assert.doesNotMatch(cursor.style.transition, /\bleft\b|\btop\b/);
+  assert.equal(cursor.style.willChange, "transform");
+  execute("control.hide");
+});
+
+test("shows a circular highlight for coordinate clicks", () => {
+  const { execute, window } = createPage(`<main></main>`);
+  const removalDelays = [];
+  window.setTimeout = (_callback, delay) => {
+    removalDelays.push(delay);
+    return 1;
+  };
+
+  execute("playwright.gestureHighlight", {
+    kind: "click",
+    x: 100,
+    y: 80
+  });
+
+  const highlight = window.document.querySelector(
+    "[data-safari-browser-use-gesture-highlight='click']"
+  );
+  const style = window.document.getElementById(
+    "__safari_browser_use_gesture_highlight_style__"
+  );
+
+  assert.notEqual(highlight, null);
+  assert.equal(parseFloat(highlight.style.left), 100 - 18);
+  assert.equal(parseFloat(highlight.style.top), 80 - 18);
+  assert.equal(parseFloat(highlight.style.width), 36);
+  assert.equal(parseFloat(highlight.style.height), 36);
+  assert.equal(highlight.style.borderRadius, "50%");
+  assert.match(style.textContent, /4000ms/);
+  assert.equal(removalDelays.at(-1), 4200);
+});
+
+test("shows a path between coordinate drag endpoints", () => {
+  const { execute, window } = createPage(`<main></main>`);
+
+  execute("playwright.gestureHighlight", {
+    kind: "drag",
+    fromX: 10,
+    fromY: 20,
+    toX: 40,
+    toY: 60
+  });
+
+  const highlight = window.document.querySelector(
+    "[data-safari-browser-use-gesture-highlight='drag']"
+  );
+  const path = highlight?.querySelector(
+    "[data-safari-browser-use-gesture-path]"
+  );
+  const start = highlight?.querySelector(
+    "[data-safari-browser-use-gesture-point='start']"
+  );
+  const end = highlight?.querySelector(
+    "[data-safari-browser-use-gesture-point='end']"
+  );
+
+  assert.notEqual(path, null);
+  assert.equal(parseFloat(path.style.left), 10);
+  assert.equal(parseFloat(path.style.top), 20);
+  assert.equal(parseFloat(path.style.width), 50);
+  assert.match(path.style.transform, /rotate\(53\.13/);
+  assert.notEqual(start, null);
+  assert.notEqual(end, null);
 });
 
 test("does not summon the cursor for read-only reads", () => {
@@ -950,6 +1146,11 @@ test("wraps a clicked element in a fading orange highlight", () => {
   const { execute, window } = createPage(
     `<button id="go">Continue</button>`
   );
+  const removalDelays = [];
+  window.setTimeout = (_callback, delay) => {
+    removalDelays.push(delay);
+    return 1;
+  };
   const button = window.document.querySelector("#go");
   button.getBoundingClientRect = () => ({
     left: 200,
@@ -980,12 +1181,12 @@ test("wraps a clicked element in a fading orange highlight", () => {
   // Orange glow.
   assert.match(glow.style.boxShadow, /255,\s*(1[234]0|165)/);
   // A single fade stylesheet is injected.
-  assert.notEqual(
-    window.document.getElementById(
-      "__safari_browser_use_highlight_style__"
-    ),
-    null
+  const style = window.document.getElementById(
+    "__safari_browser_use_highlight_style__"
   );
+  assert.notEqual(style, null);
+  assert.match(style.textContent, /4000ms/);
+  assert.equal(removalDelays.at(-1), 4200);
 });
 
 test("highlights inputs, checkboxes and selects on interaction", () => {
