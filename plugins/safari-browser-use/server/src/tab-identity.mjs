@@ -61,6 +61,19 @@ function updateTabIdentity(identity, metadata) {
   return metadata;
 }
 
+export function completeTabNavigation(identity, metadata) {
+  if (
+    String(metadata.id) !== identity.id ||
+    tabWindowId(metadata.id) !== identity.windowId
+  ) {
+    throw new Error(
+      "stale_tab_handle: navigation target changed " + identity.id
+    );
+  }
+
+  return updateTabIdentity(identity, metadata);
+}
+
 export function resolveTabIdentity(identity, tabs) {
   const candidates = tabs.filter(tab =>
     tabWindowId(tab.id) === identity.windowId

@@ -178,3 +178,30 @@ test("retargets an identity before an explicit navigation", async () => {
 
   assert.equal(identity.url, "https://example.com/dashboard");
 });
+
+test("synchronizes an identity with Safari after navigation", async () => {
+  const {
+    completeTabNavigation,
+    createTabIdentity
+  } = await loadTabIdentity();
+  const identity = createTabIdentity({
+    id: "63176:8",
+    title: "Untitled",
+    url: "about:blank"
+  });
+
+  assert.equal(typeof completeTabNavigation, "function");
+
+  completeTabNavigation(identity, {
+    id: "63176:8",
+    title: "Apple",
+    url: "https://www.apple.com/"
+  });
+
+  assert.deepEqual(identity, {
+    id: "63176:8",
+    title: "Apple",
+    url: "https://www.apple.com/",
+    windowId: "63176"
+  });
+});

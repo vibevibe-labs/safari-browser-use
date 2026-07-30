@@ -911,6 +911,15 @@ var run = (function (globalObject) {
         changeTimeoutMs: 10000,
         timeoutMs: 10000
       });
+      var navigationTarget = findTab(params.tabId);
+      completeTabNavigation(
+        params.tabIdentity,
+        tabMetadata(
+          navigationTarget.window,
+          navigationTarget.tab,
+          navigationTarget.tabIndex
+        )
+      );
       return null;
     }
 

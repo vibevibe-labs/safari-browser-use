@@ -4,7 +4,7 @@
     "args": [
       "-l",
       "JavaScript",
-      "dist/server.jxa.js"
+      "dist/safari-repl.jxa.js"
     ],
     "cwd": "."
   }

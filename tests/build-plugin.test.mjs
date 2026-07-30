@@ -11,14 +11,17 @@ test("builds a self-contained JXA MCP server", async t => {
     join(tmpdir(), "safari-browser-use-build-")
   );
   const outfile = join(directory, "server.jxa.js");
+  const skillOutfile = join(directory, "skill-server.jxa.js");
 
   t.after(async () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  await buildPlugin({ outfile });
+  await buildPlugin({ outfile, skillOutfile });
 
   const bundle = await readFile(outfile, "utf8");
+  const skillBundle = await readFile(skillOutfile, "utf8");
+  assert.equal(skillBundle, bundle);
   assert.match(bundle, /safari-browser-use/);
   assert.match(bundle, /function runPageOperation/);
   assert.match(bundle, /Application\("Safari"\)/);
@@ -44,6 +47,7 @@ test("builds a self-contained JXA MCP server", async t => {
   );
   assert.match(bundle, /playwright\.fileUploadStatus/);
   assert.match(bundle, /function resolveTabIdentity/);
+  assert.match(bundle, /completeTabNavigation/);
   assert.match(
     bundle,
     /resolveTabIdentity\(params\.tabIdentity, listTabs\(\)\)/

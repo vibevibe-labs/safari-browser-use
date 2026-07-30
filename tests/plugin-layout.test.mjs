@@ -33,10 +33,19 @@ test("all client manifests expose the shared skill and native MCP config", async
 
 test("client MCP configurations start JXA with the system osascript", async () => {
   const configurations = [
-    ["codex.mcp.json", "dist/server.jxa.js"],
-    [".mcp.json", "${CLAUDE_PLUGIN_ROOT}/dist/server.jxa.js"],
-    ["copilot.mcp.json", "${PLUGIN_ROOT}/dist/server.jxa.js"],
-    ["cursor.mcp.json", "${CURSOR_PLUGIN_ROOT}/dist/server.jxa.js"]
+    ["codex.mcp.json", "dist/safari-repl.jxa.js"],
+    [
+      ".mcp.json",
+      "${CLAUDE_PLUGIN_ROOT}/dist/safari-repl.jxa.js"
+    ],
+    [
+      "copilot.mcp.json",
+      "${PLUGIN_ROOT}/dist/safari-repl.jxa.js"
+    ],
+    [
+      "cursor.mcp.json",
+      "${CURSOR_PLUGIN_ROOT}/dist/safari-repl.jxa.js"
+    ]
   ];
 
   for (const [path, serverPath] of configurations) {
@@ -59,6 +68,14 @@ test("client MCP configurations start JXA with the system osascript", async () =
   assert.deepEqual(
     copilot.mcpServers["safari-browser-use"].tools,
     ["*"]
+  );
+
+  await access(new URL(
+    "dist/safari-repl.jxa.js",
+    pluginRoot
+  ));
+  await assert.rejects(
+    access(new URL("dist/server.jxa.js", pluginRoot))
   );
 });
 
@@ -120,7 +137,15 @@ test("repository installation guide covers every supported client", async () => 
     new URL("README.md", repositoryRoot),
     "utf8"
   );
+  const pluginOption = readme.indexOf(
+    "### 1. Plugin — one-line prompt"
+  );
+  const skillOption = readme.indexOf(
+    "### 2. Skill — one-line command"
+  );
 
+  assert.ok(pluginOption >= 0);
+  assert.ok(skillOption > pluginOption);
   assert.match(readme, /GitHub Copilot/);
   assert.match(
     readme,
@@ -144,6 +169,17 @@ test("repository installation guide covers every supported client", async () => 
   );
   assert.match(readme, /Cursor/);
   assert.match(readme, /\.cursor\/plugins\/local/);
+  assert.match(
+    readme,
+    /npx skills add vibevibe-labs\/safari-browser-use --skill control-safari -g/
+  );
+  assert.match(
+    readme,
+    /agents that do not support plugins/i
+  );
+  assert.match(readme, /Skill-only/i);
+  assert.doesNotMatch(readme, /\bPi\b/);
+  assert.doesNotMatch(readme, /\bpi install\b/);
   assert.match(readme, /using the current client's plugin installer/);
   assert.match(readme, /Stop after installation/);
   assert.match(readme, /give me one example request/);

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Control Safari"
+  short_description: "Control Safari through standalone scripts"
+  default_prompt: "Use $control-safari to automate Safari through the standalone script runtime."

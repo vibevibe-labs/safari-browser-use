@@ -1,17 +1,17 @@
 # Safari Browser Use — Operating Guide
 
 This guide is returned at runtime by `browser.documentation()`. It ships inside
-the plugin's built server, so it always matches the installed API. Read it in
-full before browser work and follow it; do not rely on remembered guidance from
-an earlier version.
+the bundled runtime, so it always matches the installed API. Read it in full
+before browser work and follow it; do not rely on remembered guidance from an
+earlier version.
 
-Every action runs through the `js` MCP tool as one synchronous JavaScript cell
-against the injected `browser`, `googleAccounts`, `googleDocs`, and
-`googleSheets` objects, over Safari's Apple Events interface. Bindings declared
-with `var` persist across cells until `js_reset`; `const` and `let` are local to
-one cell. Define one tab binding per task-owned website and keep using it for
-that site. Re-query a tab only when you intentionally switch tabs, after
-`js_reset`, or after a failed cell that never created the binding.
+Every action runs as one synchronous JavaScript cell against the injected
+`browser`, `googleAccounts`, `googleDocs`, and `googleSheets` objects over
+Safari's Apple Events interface. Bindings declared with `var` persist across
+cells until the session is reset; `const` and `let` are local to one cell. Define
+one tab binding per task-owned website and keep using it for that site. Re-query
+a tab only when you intentionally switch tabs, after a session reset, or after a
+failed cell that never created the binding.
 
 ## Browser Safety
 
@@ -102,8 +102,8 @@ finishes early:
 browser.release()
 ```
 
-`js_reset` and MCP shutdown also release control, and a 60-second inactivity
-lease removes a stale indicator if the session ends unexpectedly.
+Session reset and runtime shutdown also release control, and a 60-second
+inactivity lease removes a stale indicator if the session ends unexpectedly.
 
 Do not close tabs by default. Only close a tab you created for this task and no
 longer need, by its own tab binding. Never close, reload, or reorder tabs the
@@ -306,11 +306,10 @@ stable keys over localized text.
 
 ## API Reference
 
-The MCP server exposes two tools: `js({ title, code })` runs one synchronous
-JavaScript cell in the persistent REPL, and `js_reset()` clears user bindings and
-restores the injected `browser` object. Cells are synchronous and return the
-value of the final expression. This reference is the full supported surface; do
-not call methods that are not listed here.
+The runtime executes synchronous JavaScript cells in a persistent REPL. Resetting
+the session clears user bindings and restores the injected `browser` object.
+Cells return the value of the final expression. This reference is the full
+supported surface; do not call methods that are not listed here.
 
 ### Browser
 
@@ -576,4 +575,4 @@ var login = tab.playwright.getByRole("button", { name: "Sign in" })
 ```
 
 A later cell can reuse `tab` and `login`. Prefer `var` for reusable bindings, and
-call `js_reset` only when a clean session is required.
+reset the session only when a clean environment is required.

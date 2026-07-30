@@ -33,14 +33,14 @@ instead of keyboard focus traversal.
 ## Control Indicator Remains Visible
 
 Call `browser.release()` to remove the active tab's perimeter glow and fake
-cursor. `js_reset` also releases it. If the MCP process ended unexpectedly, the
-indicator removes itself after 60 seconds without browser activity.
+cursor. A session reset also releases it. If the runtime ended unexpectedly,
+the indicator removes itself after 60 seconds without browser activity.
 
 ## REPL Binding Conflicts
 
-Reuse or reassign an existing `var`, choose a fresh name, or call `js_reset` when
-the session genuinely needs to be cleared. Do not reset after every cell. All
-browser methods are synchronous.
+Reuse or reassign an existing `var`, choose a fresh name, or reset the session
+when it genuinely needs to be cleared. Do not reset after every cell. All browser
+methods are synchronous.
 
 ## Locator Is Ambiguous
 

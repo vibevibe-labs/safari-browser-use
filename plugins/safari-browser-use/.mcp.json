@@ -5,7 +5,7 @@
       "args": [
         "-l",
         "JavaScript",
-        "${CLAUDE_PLUGIN_ROOT}/dist/server.jxa.js"
+        "${CLAUDE_PLUGIN_ROOT}/dist/safari-repl.jxa.js"
       ]
     }
   }

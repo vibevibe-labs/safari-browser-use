@@ -5,7 +5,7 @@
       "args": [
         "-l",
         "JavaScript",
-        "${CURSOR_PLUGIN_ROOT}/dist/server.jxa.js"
+        "${CURSOR_PLUGIN_ROOT}/dist/safari-repl.jxa.js"
       ]
     }
   }

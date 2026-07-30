@@ -14,14 +14,15 @@
 
 ## Overview
 
-Safari Browser Use gives **Codex, Claude Code, GitHub Copilot, and Cursor**
-safe, visible control of the Safari tabs you already have open. It preserves
-your current sessions and logins while exposing a synchronous JavaScript REPL
-and a Playwright-style browser API.
+Safari Browser Use gives **AI agents such as Codex, Claude Code, GitHub Copilot,
+and Cursor** safe, visible control of the Safari tabs you already have open. It
+preserves your current sessions and logins while exposing a synchronous
+JavaScript REPL and a Playwright-style browser API.
 
-It connects through the Apple Events support built into macOS. It does not require Node.js,
-npm, a Safari extension, a companion app, Xcode, or an Apple Developer
-certificate.
+It connects through the Apple Events support built into macOS.
+Plugin mode does not require Node.js, npm, a Safari extension, a companion app,
+Xcode, or an Apple Developer certificate. The Skill-only mode uses the Node.js
+runtime available to the agent to preserve its script session between calls.
 
 > [!NOTE]
 > **Safari version support:** Safari Browser Use supports Safari 26 and earlier
@@ -41,7 +42,7 @@ certificate.
 
 ## Installation
 
-### Setup prompt
+### 1. Plugin — one-line prompt
 
 Paste this prompt into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 
@@ -49,7 +50,19 @@ Paste this prompt into Codex, Claude Code, GitHub Copilot CLI, or Cursor:
 Install the Safari Browser Use plugin from https://github.com/vibevibe-labs/safari-browser-use using the current client's plugin installer. Stop after installation, then tell me whether to reload plugins or start a new session and give me one example request.
 ```
 
-### Install manually
+### 2. Skill — one-line command
+
+For agents that do not support plugins, install the standalone `control-safari`
+Skill:
+
+```sh
+npx skills add vibevibe-labs/safari-browser-use --skill control-safari -g
+```
+
+Select the target agent when prompted, then start a new agent session. This
+installs the script-driven Skill without the MCP plugin.
+
+### Manual plugin commands
 
 <details>
 <summary><strong>Codex</strong></summary>
@@ -134,8 +147,8 @@ Open Safari, then ask your agent:
 > page. Do not click or type anything.
 
 The agent checks the connection, selects the active tab, and reads a structured
-DOM snapshot. Variables persist between `js` calls; use `js_reset` when you
-want a clean REPL context.
+DOM snapshot. Variables persist between JavaScript cells until the transport
+session is reset.
 
 Selecting or operating a tab adds a non-interactive perimeter glow and visible
 fake cursor to the controlled page. They share one control lifecycle: both are
@@ -151,7 +164,7 @@ the indicator in the new page before the same browser call returns.
 | ⚡ Persistent synchronous REPL | Reuse variables and browser state across tool calls |
 | 🎭 Playwright-style API | Locate elements by role, label, text, test ID, or attribute |
 | ✨ Visible control indicator | See a perimeter glow and fake cursor while AI control is active |
-| 🔌 Native agent plugins | Install directly in Codex, Claude Code, GitHub Copilot, or Cursor |
+| 🔌 Plugin and Skill-only modes | Use native plugins or the standalone Agent Skill |
 | 🛡️ Deliberate interactions | Inspect first, target unique elements, and verify every action |
 
 ## Safety

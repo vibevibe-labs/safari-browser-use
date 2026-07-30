@@ -1,4 +1,9 @@
-import { readFile, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  writeFile
+} from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -60,10 +65,31 @@ const troubleshootingPath = resolve(
 );
 const defaultOutfile = resolve(
   repositoryRoot,
-  "plugins/safari-browser-use/dist/server.jxa.js"
+  "plugins/safari-browser-use/dist/safari-repl.jxa.js"
 );
+const defaultSkillOutfile = resolve(
+  repositoryRoot,
+  "skills/control-safari/scripts/runtime/safari-repl.jxa.js"
+);
+const pluginReferencesDirectory = resolve(
+  repositoryRoot,
+  "plugins/safari-browser-use/skills/control-safari/references"
+);
+const skillReferencesDirectory = resolve(
+  repositoryRoot,
+  "skills/control-safari/references"
+);
+const sharedReferenceNames = [
+  "captcha.md",
+  "google-accounts.md",
+  "google-docs.md",
+  "google-sheets.md"
+];
 
-export async function buildPlugin({ outfile = defaultOutfile } = {}) {
+export async function buildPlugin({
+  outfile = defaultOutfile,
+  skillOutfile
+} = {}) {
   const [
     template,
     pageRuntime,
@@ -147,12 +173,33 @@ export async function buildPlugin({ outfile = defaultOutfile } = {}) {
       };`
     );
 
+  await mkdir(dirname(outfile), { recursive: true });
   await writeFile(outfile, output);
+
+  if (skillOutfile) {
+    await mkdir(dirname(skillOutfile), { recursive: true });
+    await writeFile(skillOutfile, output);
+  }
+}
+
+export async function buildDistribution() {
+  await buildPlugin({
+    outfile: defaultOutfile,
+    skillOutfile: defaultSkillOutfile
+  });
+  await mkdir(skillReferencesDirectory, { recursive: true });
+
+  await Promise.all(sharedReferenceNames.map(name =>
+    copyFile(
+      resolve(pluginReferencesDirectory, name),
+      resolve(skillReferencesDirectory, name)
+    )
+  ));
 }
 
 if (
   process.argv[1] &&
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 ) {
-  await buildPlugin();
+  await buildDistribution();
 }
