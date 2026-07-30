@@ -292,6 +292,21 @@ test("runtime guide documents bounded virtualized-list collection", async () => 
   assert.match(guide, /synthetic/i);
 });
 
+test("runtime guide prevents unmanaged file chooser dialogs", async () => {
+  const guide = await readFile(
+    new URL("server/src/documentation.md", pluginRoot),
+    "utf8"
+  );
+
+  assert.match(guide, /uploadFiles/);
+  assert.match(
+    guide,
+    /never click.*upload.*before.*uploadFiles/is
+  );
+  assert.match(guide, /dynamic.*file input/is);
+  assert.match(guide, /system file chooser/i);
+});
+
 test("control indicator docs describe only the page overlay", async () => {
   const documents = await Promise.all([
     readFile(new URL("README.md", repositoryRoot), "utf8"),

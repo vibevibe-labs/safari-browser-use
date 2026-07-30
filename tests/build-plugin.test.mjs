@@ -38,6 +38,11 @@ test("builds a self-contained JXA MCP server", async t => {
     bundle,
     /SafariLocator\.prototype\.allRecords/
   );
+  assert.match(
+    bundle,
+    /SafariLocator\.prototype\.uploadFiles/
+  );
+  assert.match(bundle, /playwright\.fileUploadStatus/);
   assert.match(bundle, /function resolveTabIdentity/);
   assert.match(
     bundle,

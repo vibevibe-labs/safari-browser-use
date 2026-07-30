@@ -717,6 +717,44 @@ var run = (function (globalObject) {
     throw new Error("locator_wait_timeout: " + state);
   }
 
+  function uploadFiles(params) {
+    var options = params.options || {};
+    var timeoutMs = Math.min(
+      options.timeoutMs === undefined ? 3000 : options.timeoutMs,
+      10000
+    );
+    var result = runPage(
+      "playwright.locator.uploadFiles",
+      params
+    );
+    var deadline = Date.now() + timeoutMs;
+
+    while (result.status === "pending" && Date.now() <= deadline) {
+      foundation.NSThread.sleepForTimeInterval(0.05);
+      result = runPage("playwright.fileUploadStatus", {
+        tabId: params.tabId,
+        token: result.token
+      });
+    }
+
+    if (result.status === "uploaded") {
+      runPage("playwright.fileUploadCleanup", {
+        tabId: params.tabId,
+        token: result.token
+      });
+      return result;
+    }
+
+    runPage("playwright.fileUploadCleanup", {
+      tabId: params.tabId,
+      token: result.token
+    });
+
+    throw new Error(
+      result.error || "file_upload_input_not_captured"
+    );
+  }
+
   function waitForURL(params) {
     var options = params.options || {};
     var expected = String(params.expected);
@@ -889,6 +927,10 @@ var run = (function (globalObject) {
 
     if (method === "playwright.locator.waitFor") {
       return waitFor(params);
+    }
+
+    if (method === "playwright.locator.uploadFiles") {
+      return uploadFiles(params);
     }
 
     if (method === "playwright.gesture") {
@@ -1233,6 +1275,13 @@ var run = (function (globalObject) {
   SafariLocator.prototype.setInputFiles = function (paths) {
     return this.call("setInputFiles", {
       files: readLocalFiles(paths)
+    });
+  };
+
+  SafariLocator.prototype.uploadFiles = function (paths, options) {
+    return this.call("uploadFiles", {
+      files: readLocalFiles(paths),
+      options: options || {}
     });
   };
 

@@ -455,6 +455,7 @@ var buy = card.getByRole("button", { name: "Buy", exact: true })
 | `selectOption(value)` | Select native `<select>` options |
 | `canvasSnapshot(options?)` | Capture one `<canvas>` element as a PNG image the model can see |
 | `setInputFiles(paths)` | Upload local file(s) into a `<input type="file">` |
+| `uploadFiles(paths, options?)` | Upload through a visible trigger that owns a static or dynamic file input |
 | `dropFiles(paths)` | Drop local file(s) onto a drag-and-drop upload zone |
 | `scrollIntoView(options?)` | Scroll one strict match into view without clicking it |
 | `waitFor(options?)` | Wait for the locator |
@@ -516,12 +517,27 @@ Provide absolute local paths; the server reads the bytes and reconstructs the
 files inside the page.
 
 ```js
+// Visible upload button or menu item
+tab.playwright.getByRole("button", {
+  name: "Upload file",
+  exact: true
+}).uploadFiles("/Users/me/photo.png")
+
 // Standard <input type="file">
 tab.playwright.locator("#avatar").setInputFiles("/Users/me/photo.png")
 
 // Drag-and-drop upload zone
 tab.playwright.locator("#dropzone").dropFiles(["/Users/me/a.pdf", "/Users/me/b.pdf"])
 ```
+
+Never click a visible upload control before calling `uploadFiles()`. The method
+arms a one-shot interceptor first, then clicks the trigger and captures a static
+or dynamically created file input without opening the system file chooser.
+
+Use `setInputFiles()` when the latest page state identifies the actual file
+input. Use `dropFiles()` only for a confirmed drag-and-drop target. If
+`uploadFiles()` reports that no file input was captured, do not retry by clicking
+the upload control; report that the site requires a native file chooser.
 
 `setInputFiles()` assigns the files through a `DataTransfer` and dispatches
 `input` and `change`; `dropFiles()` dispatches `dragenter`, `dragover`, and `drop`
