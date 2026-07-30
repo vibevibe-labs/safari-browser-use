@@ -15,7 +15,7 @@
     "developerName": "VibeVibe Labs",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
-    "defaultPrompt": "Use Safari 26 to inspect the Safari tab I identify, or my current tab if I do not name one, and complete my browser task."
+    "defaultPrompt": "Use Safari 26 in a new task tab by default, and only reuse a Safari tab when I explicitly request it."
   },
   "mcpServers": "./codex.mcp.json"
 }

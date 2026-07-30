@@ -165,6 +165,8 @@ test("returns the operating guide at runtime over stdio", async t => {
   const instructions = client.getInstructions();
   assert.match(instructions, /browser\.documentation\(\)/);
   assert.match(instructions, /untrusted content/i);
+  assert.match(instructions, /new task-owned tab/i);
+  assert.match(instructions, /explicitly asks.*reuse/i);
 
   const guide = await client.callTool({
     name: "js",

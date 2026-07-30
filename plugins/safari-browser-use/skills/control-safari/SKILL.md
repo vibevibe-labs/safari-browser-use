@@ -62,7 +62,9 @@ task, also read
 [the Google Sheets reference](references/google-sheets.md).
 
 Bindings declared with `var` persist across cells until `js_reset` is called;
-`const` and `let` are local to one cell. Define `tab` once and keep using it.
+`const` and `let` are local to one cell. By default, create a task-owned tab
+instead of reusing a user's tab. Use one persistent binding per website, and
+reuse a user tab only when the user explicitly requests it.
 
 ## Safety essentials
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Control Safari"
   short_description: "Control Safari 26 through a persistent JS REPL"
-  default_prompt: "Use $control-safari to inspect and operate the Safari tab I identify, or my current tab if I do not name one."
+  default_prompt: "Use $control-safari in a new task tab by default, and only reuse a Safari tab when I explicitly request it."

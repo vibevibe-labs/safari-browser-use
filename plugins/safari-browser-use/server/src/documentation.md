@@ -9,9 +9,9 @@ Every action runs through the `js` MCP tool as one synchronous JavaScript cell
 against the injected `browser`, `googleAccounts`, `googleDocs`, and
 `googleSheets` objects, over Safari's Apple Events interface. Bindings declared
 with `var` persist across cells until `js_reset`; `const` and `let` are local to
-one cell. Define `tab` once and keep using it. Re-query a tab only when you
-intentionally switch tabs, after `js_reset`, or after a failed cell that never
-created the binding.
+one cell. Define one tab binding per task-owned website and keep using it for
+that site. Re-query a tab only when you intentionally switch tabs, after
+`js_reset`, or after a failed cell that never created the binding.
 
 ## Browser Safety
 
@@ -49,8 +49,21 @@ A request to inspect or prepare a form does not authorize submitting it.
 
 ## Tab Resolution
 
-Resolve the target tab before you operate on it. When the user names a website,
-URL, or page title, list the open tabs first:
+Open a new task-owned tab for browser automation by default, even when a matching
+page is already open. Existing tabs belong to the user. Do not reuse, navigate,
+reload, or inspect a user-owned tab unless the user explicitly asks you to use
+that current or specific existing tab.
+
+```js
+var tab = browser.tabs.new()
+tab.goto("https://example.com")
+```
+
+When one task intentionally operates on different websites, use separate
+task-owned tabs, one for each site. Within the same website, continue navigating
+in the same task-owned tab instead of opening a new tab for every page.
+
+If the user explicitly asks to use an existing tab, list the open tabs first:
 
 ```js
 var tabs = browser.tabs.list()
@@ -63,14 +76,9 @@ Select the matching tab by ID from that metadata:
 var tab = browser.tabs.get("matching-tab-id")
 ```
 
-If no open tab matches, open a new tab and navigate it to the requested site.
 Do not inspect an unrelated current tab. Only use `browser.tabs.selected()` when
-the user explicitly asks for the current tab or provides no target.
-
-Prefer operating an already-open tab when the page you need is open, instead of
-opening a duplicate tab to the same URL. If a tab is already on the target URL,
-do not `goto()` it again; that reloads the page and can discard the user's
-in-progress input.
+the user explicitly asks for the current tab. If the requested existing tab is
+ambiguous, ask instead of guessing.
 
 A `tab` binding automatically reacquires its target when another tab closes or
 moves and its URL is unique in the original window. The runtime never recovers
@@ -562,7 +570,8 @@ JavaScript channel cannot perform them safely:
 Bindings persist across cells:
 
 ```js
-var tab = browser.tabs.selected()
+var tab = browser.tabs.new()
+tab.goto("https://example.com")
 var login = tab.playwright.getByRole("button", { name: "Sign in" })
 ```
 

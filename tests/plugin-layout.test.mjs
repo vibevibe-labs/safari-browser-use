@@ -182,7 +182,7 @@ test("skill uses Apple Events without an extension bridge", async () => {
   assert.doesNotMatch(skill, /bridge|Safari extension/i);
 });
 
-test("runtime guide resolves an explicitly named site before selecting a tab", async () => {
+test("runtime guide only selects a user tab when explicitly requested", async () => {
   const guide = await readFile(
     new URL(
       "server/src/documentation.md",
@@ -194,12 +194,44 @@ test("runtime guide resolves an explicitly named site before selecting a tab", a
   assert.match(guide, /browser\.tabs\.list\(\)/);
   assert.match(
     guide,
-    /Only use `browser\.tabs\.selected\(\)`.*current tab.*no target/is
+    /Only use `browser\.tabs\.selected\(\)`.*explicitly asks.*current tab/is
   );
   assert.match(guide, /Do not inspect an unrelated current tab/i);
+  assert.doesNotMatch(
+    guide,
+    /current tab or provides no target/i
+  );
 });
 
-test("Codex prompts defer to an explicitly named target tab", async () => {
+test("runtime guide creates task-owned tabs instead of reusing user tabs by default", async () => {
+  const guide = await readFile(
+    new URL(
+      "server/src/documentation.md",
+      pluginRoot
+    ),
+    "utf8"
+  );
+
+  assert.match(guide, /new task-owned tab.*by default/is);
+  assert.match(
+    guide,
+    /do not reuse.*user.*tab.*unless the user explicitly asks/is
+  );
+  assert.match(
+    guide,
+    /different (?:websites|sites).*separate\s+task-owned tabs/is
+  );
+  assert.match(
+    guide,
+    /same (?:website|site).*same task-owned tab/is
+  );
+  assert.doesNotMatch(
+    guide,
+    /Prefer operating an already-open tab/
+  );
+});
+
+test("Codex prompts create a task tab unless reuse is explicitly requested", async () => {
   const agent = await readFile(
     new URL(
       "skills/control-safari/agents/openai.yaml",
@@ -209,15 +241,15 @@ test("Codex prompts defer to an explicitly named target tab", async () => {
   );
   const manifest = await readJson(".codex-plugin/plugin.json");
 
-  assert.match(agent, /Safari tab I identify/i);
-  assert.doesNotMatch(agent, /my current Safari/i);
+  assert.match(agent, /new task tab by default/i);
+  assert.match(agent, /only reuse.*when I explicitly request/i);
   assert.match(
     manifest.interface.defaultPrompt,
-    /Safari tab I identify/i
+    /new task tab by default/i
   );
-  assert.doesNotMatch(
+  assert.match(
     manifest.interface.defaultPrompt,
-    /the current page/i
+    /only reuse.*when I explicitly request/i
   );
 });
 
